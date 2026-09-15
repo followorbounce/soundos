@@ -1,4 +1,4 @@
-import { NODE_TYPES, CATEGORY } from './nodeLibrary.js';
+import { NODE_TYPES } from './nodeLibrary.js';
 import { state, onChange, moveNode, removeNode, setParam, addEdge, removeEdge } from './state.js';
 import { engine } from './audio/engine.js';
 
@@ -22,12 +22,12 @@ export function currentViewportCell() {
   return { scrollLeft: viewport.scrollLeft, scrollTop: viewport.scrollTop, w: viewport.clientWidth, h: viewport.clientHeight };
 }
 
-function portEl(nodeId, portId, dir) {
-  return nodesLayer.querySelector(`.node[data-id="${nodeId}"] .port-dot[data-port="${portId}"][data-dir="${dir}"]`);
+function nubEl(nodeId, portId, dir) {
+  return nodesLayer.querySelector(`.module[data-id="${nodeId}"] .nub[data-port="${portId}"][data-dir="${dir}"]`);
 }
 
 function portPos(nodeId, portId, dir) {
-  const el = portEl(nodeId, portId, dir);
+  const el = nubEl(nodeId, portId, dir);
   if (!el) return null;
   const r = el.getBoundingClientRect();
   const innerR = inner.getBoundingClientRect();
@@ -45,12 +45,14 @@ function renderWires() {
     const p1 = portPos(edge.from.nodeId, edge.from.port, 'out');
     const p2 = portPos(edge.to.nodeId, edge.to.port, 'in');
     if (!p1 || !p2) continue;
+    const fromNode = state.nodes.get(edge.from.nodeId);
+    const color = (fromNode && NODE_TYPES[fromNode.typeId]?.color) || '#F5F5F0';
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     path.setAttribute('d', bezier(p1.x, p1.y, p2.x, p2.y));
-    path.setAttribute('stroke', '#52d3a0');
+    path.setAttribute('stroke', color);
     path.setAttribute('stroke-width', '2');
     path.setAttribute('fill', 'none');
-    path.setAttribute('opacity', '0.85');
+    path.setAttribute('opacity', '0.8');
     path.addEventListener('click', (e) => {
       e.stopPropagation();
       removeEdge(edge.id);
@@ -60,55 +62,12 @@ function renderWires() {
   if (wireDraft) {
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     path.setAttribute('d', bezier(wireDraft.x1, wireDraft.y1, wireDraft.x2, wireDraft.y2));
-    path.setAttribute('stroke', '#4f8bff');
+    path.setAttribute('stroke', '#F5F5F0');
     path.setAttribute('stroke-width', '2');
     path.setAttribute('stroke-dasharray', '4 3');
     path.setAttribute('fill', 'none');
     svg.appendChild(path);
   }
-}
-
-function paramControl(nodeId, def, node) {
-  const row = document.createElement('div');
-  row.className = 'param-row';
-  const label = document.createElement('label');
-  label.textContent = def.label;
-  row.appendChild(label);
-  const val = node.params[def.name];
-
-  if (def.type === 'select') {
-    const sel = document.createElement('select');
-    for (const opt of def.options) {
-      const o = document.createElement('option');
-      o.value = opt; o.textContent = opt;
-      if (opt === val) o.selected = true;
-      sel.appendChild(o);
-    }
-    sel.addEventListener('change', () => onParamInput(nodeId, def.name, sel.value));
-    row.appendChild(sel);
-  } else if (def.type === 'bool') {
-    const cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.checked = !!val;
-    cb.addEventListener('change', () => onParamInput(nodeId, def.name, cb.checked));
-    row.appendChild(cb);
-  } else {
-    const range = document.createElement('input');
-    range.type = 'range';
-    range.min = def.min; range.max = def.max; range.step = def.step;
-    range.value = val;
-    const out = document.createElement('span');
-    out.className = 'val';
-    out.textContent = fmt(val);
-    range.addEventListener('input', () => {
-      const v = parseFloat(range.value);
-      out.textContent = fmt(v);
-      onParamInput(nodeId, def.name, v);
-    });
-    row.appendChild(range);
-    row.appendChild(out);
-  }
-  return row;
 }
 
 function fmt(v) {
@@ -121,80 +80,182 @@ function onParamInput(nodeId, name, value) {
   if (engine.isLive()) engine.updateParam(nodeId, name, value);
 }
 
+// --- Rotary knob: drag vertically to change value, like a real pot. ---
+function buildKnob(nodeId, def, node) {
+  const wrap = document.createElement('div');
+  wrap.className = 'knobwrap';
+
+  const klabel = document.createElement('span');
+  klabel.className = 'klabel';
+  klabel.textContent = def.label;
+
+  const knob = document.createElement('div');
+  knob.className = 'knob';
+  const ind = document.createElement('div');
+  ind.className = 'ind';
+  knob.appendChild(ind);
+
+  const kval = document.createElement('span');
+  kval.className = 'kval';
+
+  const range = def.max - def.min;
+  const apply = (value) => {
+    const t = range === 0 ? 0 : (value - def.min) / range;
+    knob.style.setProperty('--t', t);
+    ind.style.transform = `rotate(${-135 + t * 270}deg)`;
+    kval.textContent = fmt(value);
+  };
+  apply(node.params[def.name]);
+
+  knob.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startY = e.clientY;
+    const startValue = node.params[def.name];
+    const onMove = (ev) => {
+      const dy = startY - ev.clientY;
+      const step = def.step || (range / 100) || 1;
+      let value = startValue + (dy / 150) * range;
+      value = Math.round(value / step) * step;
+      value = Math.min(def.max, Math.max(def.min, value));
+      apply(value);
+      onParamInput(nodeId, def.name, value);
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+
+  wrap.append(klabel, knob, kval);
+  return wrap;
+}
+
+function buildSwitch(nodeId, def, node) {
+  const wrap = document.createElement('div');
+  wrap.className = 'switchwrap';
+  const klabel = document.createElement('span');
+  klabel.className = 'klabel';
+  klabel.textContent = def.label;
+  const sw = document.createElement('div');
+  sw.className = 'fswitch';
+  const led = document.createElement('div');
+  led.className = 'led';
+  sw.appendChild(led);
+  const setEngaged = (on) => sw.classList.toggle('engaged', !!on);
+  setEngaged(node.params[def.name]);
+  sw.addEventListener('mousedown', (e) => e.stopPropagation());
+  sw.addEventListener('click', () => {
+    const value = !node.params[def.name];
+    setEngaged(value);
+    onParamInput(nodeId, def.name, value);
+  });
+  wrap.append(sw, klabel);
+  return wrap;
+}
+
+function buildSelect(nodeId, def, node) {
+  const wrap = document.createElement('div');
+  wrap.className = 'selectfield';
+  const sel = document.createElement('select');
+  sel.className = 'mselect';
+  for (const opt of def.options) {
+    const o = document.createElement('option');
+    o.value = opt;
+    o.textContent = opt;
+    if (opt === node.params[def.name]) o.selected = true;
+    sel.appendChild(o);
+  }
+  sel.addEventListener('mousedown', (e) => e.stopPropagation());
+  sel.addEventListener('change', () => onParamInput(nodeId, def.name, sel.value));
+  wrap.appendChild(sel);
+  return wrap;
+}
+
+function paramControl(nodeId, def, node) {
+  if (def.type === 'select') return buildSelect(nodeId, def, node);
+  if (def.type === 'bool') return buildSwitch(nodeId, def, node);
+  return buildKnob(nodeId, def, node);
+}
+
+function buildJack(nodeId, port, dir) {
+  const jack = document.createElement('div');
+  jack.className = `jack ${dir}` + (port.kind === 'param' ? ' cv' : '');
+  const nub = document.createElement('div');
+  nub.className = 'nub';
+  nub.dataset.node = nodeId;
+  nub.dataset.port = port.id;
+  nub.dataset.dir = dir;
+  const lbl = document.createElement('span');
+  lbl.textContent = port.label;
+  if (dir === 'out') {
+    nub.addEventListener('mousedown', (e) => startWire(e, nodeId, port.id));
+  } else {
+    nub.addEventListener('mouseup', () => finishWire(nodeId, port.id));
+  }
+  jack.append(nub, lbl);
+  return jack;
+}
+
 function renderNode(node) {
   const def = NODE_TYPES[node.typeId];
   if (!def) return;
   let el = nodeEls.get(node.id);
   if (!el) {
     el = document.createElement('div');
-    el.className = 'node';
+    el.className = 'module';
     el.dataset.id = node.id;
     nodesLayer.appendChild(el);
     nodeEls.set(node.id, el);
   }
   el.style.left = node.x + 'px';
   el.style.top = node.y + 'px';
+  el.style.setProperty('--acc', def.color);
   el.innerHTML = '';
 
-  const header = document.createElement('div');
-  header.className = 'node-header';
-  header.style.background = CATEGORY[def.category].color;
-  const title = document.createElement('span');
-  title.textContent = def.label;
-  header.appendChild(title);
+  const head = document.createElement('div');
+  head.className = 'mhead';
+  const name = document.createElement('span');
+  name.className = 'mname';
+  name.textContent = def.label;
   const del = document.createElement('button');
-  del.className = 'node-del';
+  del.className = 'mdel';
   del.textContent = '×';
   del.title = 'Удалить ноду';
+  del.addEventListener('mousedown', (e) => e.stopPropagation());
   del.addEventListener('click', (e) => { e.stopPropagation(); removeNode(node.id); });
-  header.appendChild(del);
-  header.addEventListener('mousedown', (e) => startNodeDrag(e, node));
-  el.appendChild(header);
+  head.append(name, del);
+  head.addEventListener('mousedown', (e) => startNodeDrag(e, node));
+  el.appendChild(head);
 
-  const ports = document.createElement('div');
-  ports.className = 'node-ports';
-  const colIn = document.createElement('div');
-  colIn.className = 'port-col in';
-  for (const p of def.inputs) {
-    const row = document.createElement('div');
-    row.className = 'port-row';
-    const dot = document.createElement('div');
-    dot.className = `port-dot kind-${p.kind}`;
-    dot.dataset.node = node.id; dot.dataset.port = p.id; dot.dataset.dir = 'in';
-    dot.addEventListener('mouseup', (e) => finishWire(node.id, p.id));
-    row.appendChild(dot);
-    const lbl = document.createElement('span');
-    lbl.textContent = p.label;
-    row.appendChild(lbl);
-    colIn.appendChild(row);
+  const tag = document.createElement('span');
+  tag.className = 'mtag';
+  tag.textContent = def.desc;
+  el.appendChild(tag);
+
+  if (def.inputs.length || def.outputs.length) {
+    const jackgroups = document.createElement('div');
+    jackgroups.className = 'jackgroups';
+    const colIn = document.createElement('div');
+    colIn.className = 'jackcol in';
+    for (const p of def.inputs) colIn.appendChild(buildJack(node.id, p, 'in'));
+    const colOut = document.createElement('div');
+    colOut.className = 'jackcol out';
+    for (const p of def.outputs) colOut.appendChild(buildJack(node.id, p, 'out'));
+    jackgroups.append(colIn, colOut);
+    el.appendChild(jackgroups);
   }
-  const colOut = document.createElement('div');
-  colOut.className = 'port-col out';
-  for (const p of def.outputs) {
-    const row = document.createElement('div');
-    row.className = 'port-row';
-    const dot = document.createElement('div');
-    dot.className = 'port-dot kind-audio';
-    dot.dataset.node = node.id; dot.dataset.port = p.id; dot.dataset.dir = 'out';
-    dot.addEventListener('mousedown', (e) => startWire(e, node.id, p.id));
-    const lbl = document.createElement('span');
-    lbl.textContent = p.label;
-    row.appendChild(lbl);
-    row.appendChild(dot);
-    colOut.appendChild(row);
-  }
-  ports.appendChild(colIn);
-  ports.appendChild(colOut);
-  el.appendChild(ports);
 
   const body = document.createElement('div');
-  body.className = 'node-body';
+  body.className = 'mbody';
   for (const p of def.params) body.appendChild(paramControl(node.id, p, node));
   if (def.id === 'envelope') {
     const btn = document.createElement('button');
-    btn.className = 'btn node-test';
+    btn.className = 'btn mtest';
     btn.textContent = 'Test ▸';
-    btn.addEventListener('mousedown', () => engine.isLive() && engine.voices.forEach((v) => v.instances.get(node.id)?.gateOn(engine.ctx.currentTime)));
+    btn.addEventListener('mousedown', (e) => { e.stopPropagation(); engine.isLive() && engine.voices.forEach((v) => v.instances.get(node.id)?.gateOn(engine.ctx.currentTime)); });
     btn.addEventListener('mouseup', () => engine.isLive() && engine.voices.forEach((v) => v.instances.get(node.id)?.gateOff(engine.ctx.currentTime)));
     body.appendChild(btn);
   }

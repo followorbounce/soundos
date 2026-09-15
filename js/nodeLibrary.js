@@ -45,8 +45,8 @@ function makeReverbImpulse(ctx, seconds, decay) {
 }
 
 export const CATEGORY = {
-  generator: { label: 'Генераторы', color: '#d98a3d' },
-  processor: { label: 'Обработка', color: '#4f8bff' },
+  generator: { label: 'Генераторы' },
+  processor: { label: 'Обработка' },
 };
 
 export const NODE_TYPES = {
@@ -56,6 +56,7 @@ export const NODE_TYPES = {
     id: 'oscillator',
     label: 'Oscillator',
     category: 'generator',
+    color: '#FF8C42',
     desc: 'тон / VCO',
     inputs: [
       { id: 'freq_mod', label: 'Freq', kind: 'param', param: 'frequency' },
@@ -108,6 +109,7 @@ export const NODE_TYPES = {
     id: 'lfo',
     label: 'LFO',
     category: 'generator',
+    color: '#C9E85C',
     desc: 'модуляция',
     inputs: [{ id: 'rate_mod', label: 'Rate', kind: 'param', param: 'frequency' }],
     outputs: [{ id: 'out', label: 'Out' }],
@@ -152,6 +154,7 @@ export const NODE_TYPES = {
     id: 'noise',
     label: 'Noise',
     category: 'generator',
+    color: '#39CCCC',
     desc: 'шум',
     inputs: [],
     outputs: [{ id: 'out', label: 'Out' }],
@@ -190,6 +193,7 @@ export const NODE_TYPES = {
     id: 'envelope',
     label: 'Envelope',
     category: 'generator',
+    color: '#A8D8C9',
     desc: 'ADSR / CV',
     inputs: [],
     outputs: [{ id: 'out', label: 'Out' }],
@@ -248,6 +252,7 @@ export const NODE_TYPES = {
     id: 'filter',
     label: 'Filter',
     category: 'processor',
+    color: '#6FA98A',
     desc: 'фильтр',
     inputs: [
       { id: 'in', label: 'In', kind: 'audio' },
@@ -283,6 +288,7 @@ export const NODE_TYPES = {
     id: 'amp',
     label: 'Amp / VCA',
     category: 'processor',
+    color: '#FF4136',
     desc: 'усилитель',
     inputs: [
       { id: 'in', label: 'In', kind: 'audio' },
@@ -309,6 +315,7 @@ export const NODE_TYPES = {
     id: 'mixer',
     label: 'Mixer',
     category: 'processor',
+    color: '#D8D0C0',
     desc: 'сумматор',
     inputs: [{ id: 'in', label: 'In', kind: 'audio' }],
     outputs: [{ id: 'out', label: 'Out' }],
@@ -332,6 +339,7 @@ export const NODE_TYPES = {
     id: 'delay',
     label: 'Delay',
     category: 'processor',
+    color: '#7FB8D8',
     desc: 'эхо',
     inputs: [
       { id: 'in', label: 'In', kind: 'audio' },
@@ -376,6 +384,7 @@ export const NODE_TYPES = {
     id: 'distortion',
     label: 'Distortion',
     category: 'processor',
+    color: '#E8547E',
     desc: 'дисторшн',
     inputs: [{ id: 'in', label: 'In', kind: 'audio' }],
     outputs: [{ id: 'out', label: 'Out' }],
@@ -410,6 +419,7 @@ export const NODE_TYPES = {
     id: 'reverb',
     label: 'Reverb',
     category: 'processor',
+    color: '#6B6B8C',
     desc: 'реверберация',
     inputs: [{ id: 'in', label: 'In', kind: 'audio' }],
     outputs: [{ id: 'out', label: 'Out' }],
@@ -443,6 +453,7 @@ export const NODE_TYPES = {
     id: 'math',
     label: 'Math',
     category: 'processor',
+    color: '#C9A227',
     desc: 'LFO×CV комбинатор',
     inputs: [
       { id: 'a', label: 'A', kind: 'audio' },
@@ -479,6 +490,7 @@ export const NODE_TYPES = {
     id: 'output',
     label: 'Output',
     category: 'processor',
+    color: '#F5F5F0',
     desc: 'выход / мастер',
     inputs: [{ id: 'in', label: 'In', kind: 'audio' }],
     outputs: [],
