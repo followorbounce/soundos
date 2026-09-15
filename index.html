@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SoundOS</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<header id="toolbar">
+  <div class="brand">
+    <span class="brand-dot"></span>
+    <span class="brand-name">SoundOS</span>
+    <span class="brand-sub">modular synth builder</span>
+  </div>
+  <div class="toolbar-actions">
+    <button id="btn-add-node" class="btn btn-primary">+ Node</button>
+    <button id="btn-generate" class="btn btn-accent">Generate</button>
+    <button id="btn-stop" class="btn" disabled>Stop</button>
+    <span class="sep"></span>
+    <label class="mini-label">Voices
+      <input id="voice-count" type="number" min="1" max="16" value="6" />
+    </label>
+    <span class="sep"></span>
+    <button id="btn-export" class="btn">Export</button>
+    <button id="btn-import" class="btn">Import</button>
+    <input id="file-import" type="file" accept="application/json" hidden />
+    <button id="btn-clear" class="btn btn-danger">Clear</button>
+  </div>
+</header>
+
+<main id="workspace">
+  <div id="canvas-viewport">
+    <div id="canvas-inner">
+      <svg id="wires-svg"></svg>
+      <div id="nodes-layer"></div>
+    </div>
+    <div id="grid-overlay" hidden></div>
+  </div>
+
+  <aside id="node-menu" hidden>
+    <div class="menu-head">
+      <input id="menu-search" type="text" placeholder="Найти ноду..." />
+      <button id="menu-close" class="btn-icon">×</button>
+    </div>
+    <div id="menu-list" class="menu-list"></div>
+  </aside>
+
+  <section id="keyboard-panel" hidden>
+    <div class="kb-head">
+      <span>Клавиатура: A W S E D F T G Y H U J K играют ноты, Z/X — октава</span>
+      <span id="kb-octave">Октава: 4</span>
+    </div>
+    <div id="piano"></div>
+  </section>
+</main>
+
+<div id="toast-stack"></div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
