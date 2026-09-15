@@ -23,9 +23,24 @@ export function addNode(typeId, x, y, defParams) {
   const id = nextId('n');
   const params = {};
   for (const p of defParams) params[p.name] = p.default;
-  state.nodes.set(id, { id, typeId, x, y, params });
+  state.nodes.set(id, { id, typeId, x, y, params, bypassed: false });
   emit('node-add', id);
   return id;
+}
+
+export function toggleBypass(id) {
+  const n = state.nodes.get(id);
+  if (!n) return;
+  n.bypassed = !n.bypassed;
+  emit('bypass-change', { id, bypassed: n.bypassed });
+  return n.bypassed;
+}
+
+export function setBypassState(id, bypassed) {
+  const n = state.nodes.get(id);
+  if (!n || n.bypassed === bypassed) return;
+  n.bypassed = bypassed;
+  emit('bypass-change', { id, bypassed });
 }
 
 export function removeNode(id) {

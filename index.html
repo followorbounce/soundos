@@ -21,9 +21,13 @@
     <button id="btn-generate" class="btn btn-accent">Generate</button>
     <button id="btn-stop" class="btn" disabled>Stop</button>
     <span class="sep"></span>
-    <label class="mini-label">Voices
-      <input id="voice-count" type="number" min="1" max="16" value="6" />
-    </label>
+    <button id="btn-kill" class="btn btn-danger" title="Зажать — мгновенно заглушить всё, отпустить — вернуть звук">⛔ Kill</button>
+    <button id="btn-random" class="btn" title="Перемешать все ручки на холсте">⚄ Chance</button>
+    <select id="preset-select" class="btn" title="Пресеты настройки из Pulse Train — Stage II">
+      <option value="">Presets…</option>
+    </select>
+    <button id="btn-scope-mode" class="btn">Scopes: Wave</button>
+    <button id="btn-stage" class="btn" title="Полноэкранный режим для перформанса">⛶ Stage</button>
     <span class="sep"></span>
     <button id="btn-export" class="btn">Export</button>
     <button id="btn-import" class="btn">Import</button>
@@ -48,14 +52,6 @@
     </div>
     <div id="menu-list" class="menu-list"></div>
   </aside>
-
-  <section id="keyboard-panel" hidden>
-    <div class="kb-head">
-      <span>Клавиатура: A W S E D F T G Y H U J K играют ноты, Z/X — октава</span>
-      <span id="kb-octave">Октава: 4</span>
-    </div>
-    <div id="piano"></div>
-  </section>
 </main>
 
 <div id="toast-stack"></div>

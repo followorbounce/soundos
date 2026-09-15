@@ -14,7 +14,7 @@ const isDesktop = () => window.matchMedia('(min-width: 900px)').matches && !('on
 function buildList(filter = '') {
   listEl.innerHTML = '';
   const groups = nodeTypesByCategory();
-  for (const catId of ['generator', 'processor']) {
+  for (const catId of ['generator', 'processor', 'video']) {
     const items = groups[catId].filter((t) => t.label.toLowerCase().includes(filter) || t.desc.toLowerCase().includes(filter));
     if (!items.length) continue;
     const section = document.createElement('div');

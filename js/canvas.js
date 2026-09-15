@@ -1,5 +1,5 @@
 import { NODE_TYPES } from './nodeLibrary.js';
-import { state, onChange, moveNode, removeNode, setParam, addEdge, removeEdge } from './state.js';
+import { state, onChange, moveNode, removeNode, setParam, addEdge, removeEdge, toggleBypass, setBypassState } from './state.js';
 import { engine } from './audio/engine.js';
 
 const viewport = document.getElementById('canvas-viewport');
@@ -12,6 +12,52 @@ let dragState = null; // node drag
 let wireDraft = null; // {fromNodeId, fromPort, x1, y1}
 let panState = null;
 let selectedId = null;
+let scopeMode = 'wave'; // 'wave' | 'spectrum' — global, toggled from the toolbar, same as Pulse Train's Scopes button
+const VIDEO_PORTS = ['in1', 'in2', 'in3', 'in4'];
+
+export function setScopeMode(mode) {
+  scopeMode = mode;
+}
+
+// Reshuffle every continuous knob on the board — a "Chance" button for live
+// performance, same idea as Pulse Train's randomizer, but general-purpose
+// across whatever nodes happen to be patched in right now.
+export function randomizeAllParams() {
+  for (const node of state.nodes.values()) {
+    const def = NODE_TYPES[node.typeId];
+    if (!def) continue;
+    for (const p of def.params) {
+      if (p.type === 'select' || p.type === 'bool') continue;
+      const raw = p.min + Math.random() * (p.max - p.min);
+      const stepped = p.step ? Math.round(raw / p.step) * p.step : raw;
+      const value = Math.min(p.max, Math.max(p.min, stepped));
+      setParam(node.id, p.name, value);
+      if (engine.isLive()) engine.updateParam(node.id, p.name, value);
+    }
+  }
+  fullRender();
+}
+
+// Apply a preset by role name (see js/presets.js): `roles` maps a role like
+// 'tone2' or 'space' to the actual node id in the current patch, so this
+// works against whatever the starter rack currently is, not fixed ids.
+export function applyPreset(roles, params, bypass) {
+  for (const [role, values] of Object.entries(params || {})) {
+    const id = roles[role];
+    if (!id || !state.nodes.has(id)) continue;
+    for (const [name, value] of Object.entries(values)) {
+      setParam(id, name, value);
+      if (engine.isLive()) engine.updateParam(id, name, value);
+    }
+  }
+  for (const [role, bypassed] of Object.entries(bypass || {})) {
+    const id = roles[role];
+    if (!id || !state.nodes.has(id)) continue;
+    setBypassState(id, bypassed);
+    if (engine.isLive()) engine.setBypass(id, bypassed);
+  }
+  fullRender();
+}
 
 export function screenToInner(clientX, clientY) {
   const r = inner.getBoundingClientRect();
@@ -47,17 +93,47 @@ function renderWires() {
     if (!p1 || !p2) continue;
     const fromNode = state.nodes.get(edge.from.nodeId);
     const color = (fromNode && NODE_TYPES[fromNode.typeId]?.color) || '#F5F5F0';
+    const d = bezier(p1.x, p1.y, p2.x, p2.y);
+    const disconnect = (e) => { e.stopPropagation(); removeEdge(edge.id); };
+
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.setAttribute('d', bezier(p1.x, p1.y, p2.x, p2.y));
+    path.setAttribute('d', d);
     path.setAttribute('stroke', color);
     path.setAttribute('stroke-width', '2');
     path.setAttribute('fill', 'none');
     path.setAttribute('opacity', '0.8');
-    path.addEventListener('click', (e) => {
-      e.stopPropagation();
-      removeEdge(edge.id);
-    });
     svg.appendChild(path);
+
+    // A thin 2px stroke is nearly impossible to click precisely — this
+    // invisible, much fatter twin sits on top and does the actual hit
+    // testing, so clicking anywhere near the cable disconnects it.
+    const hit = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    hit.setAttribute('d', d);
+    hit.setAttribute('stroke', 'transparent');
+    hit.setAttribute('stroke-width', '16');
+    hit.setAttribute('fill', 'none');
+    hit.style.cursor = 'pointer';
+    hit.addEventListener('click', disconnect);
+    svg.appendChild(hit);
+
+    // Explicit "disconnect" marker at the cable's midpoint — a real tool,
+    // not just a hope that the click lands on the wire.
+    const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
+    const marker = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    marker.setAttribute('class', 'wire-marker');
+    marker.style.cursor = 'pointer';
+    marker.style.pointerEvents = 'auto'; // parent svg is pointer-events:none for background panning; this element opts back in
+    const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    dot.setAttribute('cx', mx); dot.setAttribute('cy', my); dot.setAttribute('r', '7');
+    dot.setAttribute('fill', '#141414'); dot.setAttribute('stroke', color); dot.setAttribute('stroke-width', '1.5');
+    const cross = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    cross.setAttribute('x', mx); cross.setAttribute('y', my);
+    cross.setAttribute('text-anchor', 'middle'); cross.setAttribute('dominant-baseline', 'central');
+    cross.setAttribute('font-size', '10'); cross.setAttribute('fill', '#F5F5F0');
+    cross.textContent = '×';
+    marker.append(dot, cross);
+    marker.addEventListener('click', disconnect);
+    svg.appendChild(marker);
   }
   if (wireDraft) {
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -78,6 +154,16 @@ function fmt(v) {
 function onParamInput(nodeId, name, value) {
   setParam(nodeId, name, value);
   if (engine.isLive()) engine.updateParam(nodeId, name, value);
+  if (name === 'resolution') {
+    const canvas = nodeEls.get(nodeId)?.querySelector('.mvideo-canvas');
+    if (canvas) applyVideoResolution(canvas, value);
+  }
+}
+
+function applyVideoResolution(canvas, resStr) {
+  const [w, h] = (resStr || '640x480').split('x').map(Number);
+  canvas.width = w || 640;
+  canvas.height = h || 480;
 }
 
 // --- Rotary knob: drag vertically to change value, like a real pot. ---
@@ -213,20 +299,40 @@ function renderNode(node) {
   el.style.left = node.x + 'px';
   el.style.top = node.y + 'px';
   el.style.setProperty('--acc', def.color);
+  el.classList.toggle('bypassed', !!node.bypassed);
   el.innerHTML = '';
 
   const head = document.createElement('div');
   head.className = 'mhead';
+  const headLeft = document.createElement('div');
+  headLeft.className = 'mhead-left';
   const name = document.createElement('span');
   name.className = 'mname';
   name.textContent = def.label;
+  headLeft.appendChild(name);
+
+  const bypassBtn = document.createElement('button');
+  bypassBtn.className = 'fswitch' + (node.bypassed ? '' : ' engaged');
+  bypassBtn.title = (def.id === 'videoOutput' ? 'Пауза видео: ' : 'Байпас: ') + def.label;
+  bypassBtn.appendChild(Object.assign(document.createElement('span'), { className: 'led' }));
+  bypassBtn.addEventListener('mousedown', (e) => e.stopPropagation());
+  bypassBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const bypassed = toggleBypass(node.id);
+    bypassBtn.classList.toggle('engaged', !bypassed);
+    el.classList.toggle('bypassed', bypassed);
+    if (engine.isLive()) engine.setBypass(node.id, bypassed);
+  });
+  headLeft.appendChild(bypassBtn);
+  head.appendChild(headLeft);
+
   const del = document.createElement('button');
   del.className = 'mdel';
   del.textContent = '×';
   del.title = 'Удалить ноду';
   del.addEventListener('mousedown', (e) => e.stopPropagation());
   del.addEventListener('click', (e) => { e.stopPropagation(); removeNode(node.id); });
-  head.append(name, del);
+  head.appendChild(del);
   head.addEventListener('mousedown', (e) => startNodeDrag(e, node));
   el.appendChild(head);
 
@@ -255,11 +361,38 @@ function renderNode(node) {
     const btn = document.createElement('button');
     btn.className = 'btn mtest';
     btn.textContent = 'Test ▸';
-    btn.addEventListener('mousedown', (e) => { e.stopPropagation(); engine.isLive() && engine.voices.forEach((v) => v.instances.get(node.id)?.gateOn(engine.ctx.currentTime)); });
-    btn.addEventListener('mouseup', () => engine.isLive() && engine.voices.forEach((v) => v.instances.get(node.id)?.gateOff(engine.ctx.currentTime)));
+    btn.addEventListener('mousedown', (e) => { e.stopPropagation(); engine.isLive() && engine.instances.get(node.id)?.gateOn(engine.ctx.currentTime); });
+    btn.addEventListener('mouseup', () => engine.isLive() && engine.instances.get(node.id)?.gateOff(engine.ctx.currentTime));
     body.appendChild(btn);
   }
   el.appendChild(body);
+
+  if (def.outputs.length) {
+    const scopeWrap = document.createElement('div');
+    scopeWrap.className = 'scopewrap';
+    const canvas = document.createElement('canvas');
+    canvas.className = 'mscope-canvas';
+    canvas.width = 260;
+    canvas.height = 56;
+    scopeWrap.appendChild(canvas);
+    el.appendChild(scopeWrap);
+  }
+
+  if (def.id === 'videoOutput') {
+    const canvas = document.createElement('canvas');
+    canvas.className = 'mvideo-canvas';
+    applyVideoResolution(canvas, node.params.resolution);
+    el.appendChild(canvas);
+    const actions = document.createElement('div');
+    actions.className = 'mvideo-actions';
+    const fsBtn = document.createElement('button');
+    fsBtn.className = 'btn mvideo-fullscreen';
+    fsBtn.textContent = '⛶ Fullscreen';
+    fsBtn.addEventListener('mousedown', (e) => e.stopPropagation());
+    fsBtn.addEventListener('click', (e) => { e.stopPropagation(); canvas.requestFullscreen?.(); });
+    actions.appendChild(fsBtn);
+    el.appendChild(actions);
+  }
 
   el.addEventListener('mousedown', () => selectNode(node.id));
 }
@@ -339,6 +472,101 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+function drawScope(canvas, analyser, color) {
+  const ctx2d = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  ctx2d.fillStyle = '#000';
+  ctx2d.fillRect(0, 0, w, h);
+  if (scopeMode === 'spectrum') {
+    const freqData = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteFrequencyData(freqData);
+    const barCount = Math.min(48, freqData.length);
+    const barW = w / barCount;
+    ctx2d.fillStyle = color;
+    for (let i = 0; i < barCount; i++) {
+      const v = (freqData[i] / 255) * h;
+      ctx2d.fillRect(i * barW, h - v, Math.max(1, barW - 1), v);
+    }
+  } else {
+    const timeData = new Float32Array(analyser.fftSize);
+    analyser.getFloatTimeDomainData(timeData);
+    ctx2d.strokeStyle = color;
+    ctx2d.lineWidth = 1.5;
+    ctx2d.beginPath();
+    const n = timeData.length;
+    for (let i = 0; i < n; i++) {
+      const x = (i / (n - 1)) * w;
+      const y = h / 2 - timeData[i] * (h / 2 - 2);
+      if (i === 0) ctx2d.moveTo(x, y); else ctx2d.lineTo(x, y);
+    }
+    ctx2d.stroke();
+  }
+}
+
+function connectedVideoPorts(nodeId) {
+  return VIDEO_PORTS.filter((pid) =>
+    [...state.edges.values()].some((e) => e.to.nodeId === nodeId && e.to.port === pid)
+  );
+}
+
+function combineSamples(op, vals) {
+  switch (op) {
+    case 'sub': return vals.reduce((a, b, i) => (i === 0 ? a : a - b));
+    case 'mul': return vals.reduce((a, b) => a * b, 1);
+    case 'min': return Math.min(...vals);
+    case 'max': return Math.max(...vals);
+    case 'avg': return vals.reduce((a, b) => a + b, 0) / vals.length;
+    default: return vals.reduce((a, b) => a + b, 0); // add
+  }
+}
+
+function drawVideoNode(node, canvas) {
+  const ctx2d = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  ctx2d.fillStyle = '#000';
+  ctx2d.fillRect(0, 0, w, h);
+  const inst = engine.instances.get(node.id);
+  if (!inst?.analysers) return;
+  const ports = connectedVideoPorts(node.id);
+  if (!ports.length) return;
+  const arrays = ports.map((pid) => {
+    const analyser = inst.analysers[VIDEO_PORTS.indexOf(pid)];
+    const buf = new Float32Array(analyser.fftSize);
+    analyser.getFloatTimeDomainData(buf);
+    return buf;
+  });
+  const op = node.params.operation || 'add';
+  const gain = node.params.gain ?? 1;
+  const n = arrays[0].length;
+  ctx2d.strokeStyle = NODE_TYPES.videoOutput.color;
+  ctx2d.lineWidth = 2;
+  ctx2d.beginPath();
+  for (let i = 0; i < n; i++) {
+    const v = Math.max(-1, Math.min(1, combineSamples(op, arrays.map((a) => a[i])) * gain));
+    const x = (i / (n - 1)) * w;
+    const y = h / 2 - v * (h / 2 - 4);
+    if (i === 0) ctx2d.moveTo(x, y); else ctx2d.lineTo(x, y);
+  }
+  ctx2d.stroke();
+}
+
+function tickScopes() {
+  if (engine.isLive()) {
+    for (const node of state.nodes.values()) {
+      const canvas = nodeEls.get(node.id)?.querySelector('.mscope-canvas');
+      const analyser = engine.getScopeAnalyser(node.id);
+      if (!canvas || !analyser) continue;
+      drawScope(canvas, analyser, NODE_TYPES[node.typeId]?.color || '#F5F5F0');
+    }
+    for (const node of state.nodes.values()) {
+      if (node.typeId !== 'videoOutput' || node.bypassed) continue;
+      const canvas = nodeEls.get(node.id)?.querySelector('.mvideo-canvas');
+      if (canvas) drawVideoNode(node, canvas);
+    }
+  }
+  requestAnimationFrame(tickScopes);
+}
+
 function fullRender() {
   for (const id of [...nodeEls.keys()]) {
     if (!state.nodes.has(id)) { nodeEls.get(id).remove(); nodeEls.delete(id); }
@@ -367,4 +595,5 @@ onChange((kind, payload) => {
 
 export function initCanvas() {
   fullRender();
+  requestAnimationFrame(tickScopes);
 }

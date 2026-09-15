@@ -6,8 +6,9 @@
 //     audioParams: { paramName: AudioParam }                     // kind:'param' ports
 //     output:   AudioNode | null                                 // single output port
 //     setParam(name, value)
-//     applyNote(freq)   // optional, generators that track the keyboard
-//     gateOn(time) / gateOff(time)  // optional, envelope-style generators
+//     gateOn(time) / gateOff(time)  // optional, envelope-style generators — opened
+//                                   // once when Generate starts the (single,
+//                                   // permanently-running) graph, never per-note
 //     dispose()
 //   }
 //
@@ -32,6 +33,49 @@ function makeDistortionCurve(amount) {
   return curve;
 }
 
+function makeClickCurve(decay) {
+  const n = 1024;
+  const curve = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const p = i / (n - 1); // WaveShaper input -1..1 maps to phase 0..1 across one sawtooth cycle
+    curve[i] = Math.exp(-p * decay);
+  }
+  return curve;
+}
+
+function makeCrushCurve(bits) {
+  const n = 1024;
+  const levels = Math.pow(2, Math.max(1, Math.min(16, bits)));
+  const curve = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = (i * 2) / n - 1;
+    curve[i] = Math.round(x * levels) / levels;
+  }
+  return curve;
+}
+
+function makeDutyCurve(duty) {
+  const n = 1024;
+  const curve = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const p = i / (n - 1);
+    curve[i] = p < duty ? 1 : 0;
+  }
+  return curve;
+}
+
+function makeStepCurve(steps) {
+  const n = 1024;
+  const s = Math.max(2, Math.round(steps));
+  const curve = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = (i * 2) / n - 1; // -1..1
+    const p = (x + 1) / 2; // 0..1
+    curve[i] = (Math.round(p * (s - 1)) / (s - 1)) * 2 - 1; // quantized, back to -1..1
+  }
+  return curve;
+}
+
 function makeReverbImpulse(ctx, seconds, decay) {
   const len = Math.max(1, Math.floor(ctx.sampleRate * seconds));
   const buf = ctx.createBuffer(2, len, ctx.sampleRate);
@@ -47,6 +91,7 @@ function makeReverbImpulse(ctx, seconds, decay) {
 export const CATEGORY = {
   generator: { label: 'Генераторы' },
   processor: { label: 'Обработка' },
+  video: { label: 'Видео' },
 };
 
 export const NODE_TYPES = {
@@ -66,7 +111,6 @@ export const NODE_TYPES = {
     params: [
       { name: 'waveform', label: 'Wave', type: 'select', options: ['sine', 'square', 'sawtooth', 'triangle'], default: 'sine' },
       { name: 'freq', label: 'Freq', type: 'range', min: 20, max: 2000, step: 1, default: 440 },
-      { name: 'keyTrack', label: 'Key trk', type: 'bool', default: true },
       { name: 'level', label: 'Level', type: 'range', min: 0, max: 1, step: 0.01, default: 0.7 },
     ],
     build(ctx) {
@@ -77,24 +121,14 @@ export const NODE_TYPES = {
       gain.gain.value = 0.7;
       osc.connect(gain);
       osc.start();
-      let keyTrack = true;
-      let baseFreq = 440;
       return {
         inputs: {},
         audioParams: { frequency: osc.frequency, detune: osc.detune },
         output: gain,
         setParam(name, value) {
           if (name === 'waveform') osc.type = value;
-          else if (name === 'freq') {
-            baseFreq = value;
-            if (!keyTrack) osc.frequency.setTargetAtTime(value, ctx.currentTime, 0.01);
-          } else if (name === 'keyTrack') {
-            keyTrack = value;
-            if (!keyTrack) osc.frequency.setTargetAtTime(baseFreq, ctx.currentTime, 0.01);
-          } else if (name === 'level') gain.gain.setTargetAtTime(value, ctx.currentTime, 0.01);
-        },
-        applyNote(freq) {
-          if (keyTrack) osc.frequency.setTargetAtTime(freq, ctx.currentTime, 0.004);
+          else if (name === 'freq') osc.frequency.setTargetAtTime(value, ctx.currentTime, 0.01);
+          else if (name === 'level') gain.gain.setTargetAtTime(value, ctx.currentTime, 0.01);
         },
         dispose() {
           try { osc.stop(); } catch (e) {}
@@ -246,6 +280,66 @@ export const NODE_TYPES = {
     },
   },
 
+  rhythm: {
+    id: 'rhythm',
+    label: 'Rhythm',
+    category: 'generator',
+    color: '#FFD166',
+    desc: 'импульс / клок',
+    inputs: [{ id: 'rate_mod', label: 'Rate', kind: 'param', param: 'rate' }],
+    outputs: [{ id: 'out', label: 'Out' }],
+    params: [
+      { name: 'rate', label: 'Rate', type: 'range', min: 0.25, max: 20, step: 0.05, default: 4 },
+      { name: 'decay', label: 'Decay', type: 'range', min: 2, max: 40, step: 0.5, default: 12 },
+      { name: 'tone', label: 'Tone', type: 'range', min: 200, max: 8000, step: 10, default: 1500 },
+      { name: 'level', label: 'Level', type: 'range', min: 0, max: 1, step: 0.01, default: 0.6 },
+    ],
+    // A self-clocked click generator, not a note: a sawtooth "clock" run through
+    // a WaveShaper curve that decays from 1 to 0 across each cycle becomes a
+    // repeating envelope (the clock's own hard wrap from +1 back to -1 gives
+    // the near-instant attack), which then gates highpassed noise — the same
+    // impulse-per-cycle trick used for Rhythm in Pulse Train, minus its
+    // external edge-trigger input.
+    build(ctx) {
+      const clock = ctx.createOscillator();
+      clock.type = 'sawtooth';
+      clock.frequency.value = 4;
+      clock.start();
+      const shaper = ctx.createWaveShaper();
+      shaper.curve = makeClickCurve(12);
+      shaper.oversample = 'none';
+      const noise = ctx.createBufferSource();
+      noise.buffer = makeWhiteNoiseBuffer(ctx);
+      noise.loop = true;
+      noise.start();
+      const hp = ctx.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.value = 1500;
+      const env = ctx.createGain();
+      env.gain.value = 0;
+      clock.connect(shaper).connect(env.gain);
+      noise.connect(hp).connect(env);
+      const level = ctx.createGain();
+      level.gain.value = 0.6;
+      env.connect(level);
+      return {
+        inputs: {},
+        audioParams: { rate: clock.frequency },
+        output: level,
+        setParam(name, value) {
+          if (name === 'rate') clock.frequency.setTargetAtTime(value, ctx.currentTime, 0.01);
+          else if (name === 'decay') shaper.curve = makeClickCurve(value);
+          else if (name === 'tone') hp.frequency.setTargetAtTime(value, ctx.currentTime, 0.01);
+          else if (name === 'level') level.gain.setTargetAtTime(value, ctx.currentTime, 0.01);
+        },
+        dispose() {
+          try { clock.stop(); noise.stop(); } catch (e) {}
+          [clock, shaper, noise, hp, env, level].forEach((n) => n.disconnect());
+        },
+      };
+    },
+  },
+
   // ---------------- PROCESSORS ----------------
 
   filter: {
@@ -380,6 +474,101 @@ export const NODE_TYPES = {
     },
   },
 
+  freeze: {
+    id: 'freeze',
+    label: 'Freeze',
+    category: 'processor',
+    color: '#5B8FA8',
+    desc: 'дилей, вытянутый почти до бесконечности',
+    inputs: [
+      { id: 'in', label: 'In', kind: 'audio' },
+      { id: 'time_mod', label: 'Time', kind: 'param', param: 'delayTime' },
+    ],
+    outputs: [{ id: 'out', label: 'Out' }],
+    // Same feedback-delay recurrence as Delay, just pushed to ~98% instead of
+    // the usual 80-90% an echo tops out at — a struck signal barely decays,
+    // cycling almost indefinitely instead of fading into discrete repeats.
+    params: [
+      { name: 'time', label: 'Time', type: 'range', min: 0, max: 3, step: 0.01, default: 0.6 },
+      { name: 'feedback', label: 'Fbck', type: 'range', min: 0, max: 0.99, step: 0.005, default: 0.9 },
+      { name: 'mix', label: 'Mix', type: 'range', min: 0, max: 1, step: 0.01, default: 0.4 },
+    ],
+    build(ctx) {
+      const input = ctx.createGain();
+      const delay = ctx.createDelay(5);
+      delay.delayTime.value = 0.6;
+      const feedback = ctx.createGain();
+      feedback.gain.value = 0.9;
+      const wet = ctx.createGain(); wet.gain.value = 0.4;
+      const dry = ctx.createGain(); dry.gain.value = 0.6;
+      const out = ctx.createGain();
+      input.connect(delay);
+      delay.connect(feedback).connect(delay);
+      delay.connect(wet).connect(out);
+      input.connect(dry).connect(out);
+      return {
+        inputs: { in: { node: input, index: 0 } },
+        audioParams: { delayTime: delay.delayTime },
+        output: out,
+        setParam(name, value) {
+          if (name === 'time') delay.delayTime.setTargetAtTime(value, ctx.currentTime, 0.01);
+          else if (name === 'feedback') feedback.gain.setTargetAtTime(value, ctx.currentTime, 0.01);
+          else if (name === 'mix') { wet.gain.setTargetAtTime(value, ctx.currentTime, 0.01); dry.gain.setTargetAtTime(1 - value, ctx.currentTime, 0.01); }
+        },
+        dispose() { [input, delay, feedback, wet, dry, out].forEach((n) => n.disconnect()); },
+      };
+    },
+  },
+
+  comb: {
+    id: 'comb',
+    label: 'Comb',
+    category: 'processor',
+    color: '#C97A4A',
+    desc: 'металлический резонатор',
+    inputs: [
+      { id: 'in', label: 'In', kind: 'audio' },
+      { id: 'freq_mod', label: 'Freq', kind: 'param', param: 'delayTime' },
+    ],
+    outputs: [{ id: 'out', label: 'Out' }],
+    // The identical feedback-delay structure as Freeze/Delay, at a completely
+    // different time scale: delay times short enough to be inaudible as
+    // separate echoes. The `freq` knob sets delay time to 1/freq internally,
+    // so it reads as a pitch, not a duration; a CV patched into `freq_mod`
+    // instead nudges the raw delay time directly (same convention as
+    // Delay/Freeze's own time_mod), not the frequency.
+    params: [
+      { name: 'freq', label: 'Freq', type: 'range', min: 40, max: 4000, step: 1, default: 220 },
+      { name: 'resonance', label: 'Res', type: 'range', min: 0, max: 0.95, step: 0.01, default: 0.6 },
+      { name: 'mix', label: 'Mix', type: 'range', min: 0, max: 1, step: 0.01, default: 0.5 },
+    ],
+    build(ctx) {
+      const input = ctx.createGain();
+      const delay = ctx.createDelay(1);
+      delay.delayTime.value = 1 / 220;
+      const feedback = ctx.createGain();
+      feedback.gain.value = 0.6;
+      const wet = ctx.createGain(); wet.gain.value = 0.5;
+      const dry = ctx.createGain(); dry.gain.value = 0.5;
+      const out = ctx.createGain();
+      input.connect(delay);
+      delay.connect(feedback).connect(delay);
+      delay.connect(wet).connect(out);
+      input.connect(dry).connect(out);
+      return {
+        inputs: { in: { node: input, index: 0 } },
+        audioParams: { delayTime: delay.delayTime },
+        output: out,
+        setParam(name, value) {
+          if (name === 'freq') delay.delayTime.setTargetAtTime(1 / Math.max(20, value), ctx.currentTime, 0.005);
+          else if (name === 'resonance') feedback.gain.setTargetAtTime(value, ctx.currentTime, 0.01);
+          else if (name === 'mix') { wet.gain.setTargetAtTime(value, ctx.currentTime, 0.01); dry.gain.setTargetAtTime(1 - value, ctx.currentTime, 0.01); }
+        },
+        dispose() { [input, delay, feedback, wet, dry, out].forEach((n) => n.disconnect()); },
+      };
+    },
+  },
+
   distortion: {
     id: 'distortion',
     label: 'Distortion',
@@ -415,6 +604,198 @@ export const NODE_TYPES = {
     },
   },
 
+  crush: {
+    id: 'crush',
+    label: 'Crush',
+    category: 'processor',
+    color: '#E0A458',
+    desc: 'битдробление',
+    inputs: [{ id: 'in', label: 'In', kind: 'audio' }],
+    outputs: [{ id: 'out', label: 'Out' }],
+    params: [
+      { name: 'bits', label: 'Bits', type: 'range', min: 1, max: 16, step: 1, default: 6 },
+      { name: 'mix', label: 'Mix', type: 'range', min: 0, max: 1, step: 0.01, default: 1 },
+    ],
+    // Amplitude quantization: Q(x,b) = round(x·2^(b-1)) / 2^(b-1), the same
+    // staircase-WaveShaper technique as Pulse Train's Crush node.
+    build(ctx) {
+      const input = ctx.createGain();
+      const shaper = ctx.createWaveShaper();
+      shaper.curve = makeCrushCurve(6);
+      shaper.oversample = 'none';
+      const wet = ctx.createGain(); wet.gain.value = 1;
+      const dry = ctx.createGain(); dry.gain.value = 0;
+      const out = ctx.createGain();
+      input.connect(shaper).connect(wet).connect(out);
+      input.connect(dry).connect(out);
+      return {
+        inputs: { in: { node: input, index: 0 } },
+        audioParams: {},
+        output: out,
+        setParam(name, value) {
+          if (name === 'bits') shaper.curve = makeCrushCurve(value);
+          else if (name === 'mix') { wet.gain.setTargetAtTime(value, ctx.currentTime, 0.01); dry.gain.setTargetAtTime(1 - value, ctx.currentTime, 0.01); }
+        },
+        dispose() { [input, shaper, wet, dry, out].forEach((n) => n.disconnect()); },
+      };
+    },
+  },
+
+  ring: {
+    id: 'ring',
+    label: 'Ring',
+    category: 'processor',
+    color: '#8B7FB8',
+    desc: 'кольцевая модуляция',
+    inputs: [
+      { id: 'in', label: 'In', kind: 'audio' },
+      { id: 'freq_mod', label: 'Freq', kind: 'param', param: 'frequency' },
+    ],
+    outputs: [{ id: 'out', label: 'Out' }],
+    params: [
+      { name: 'waveform', label: 'Wave', type: 'select', options: ['sine', 'square', 'sawtooth', 'triangle'], default: 'sine' },
+      { name: 'freq', label: 'Freq', type: 'range', min: 20, max: 4000, step: 1, default: 220 },
+      { name: 'mix', label: 'Mix', type: 'range', min: 0, max: 1, step: 0.01, default: 1 },
+    ],
+    // True 4-quadrant ring mod: the carrier drives the input gain's own gain
+    // AudioParam directly, so y(t) = x(t)·carrier(t) — sum/difference
+    // sidebands, not a one-sided tremolo wobble.
+    build(ctx) {
+      const carrier = ctx.createOscillator();
+      carrier.type = 'sine';
+      carrier.frequency.value = 220;
+      carrier.start();
+      const input = ctx.createGain();
+      const ringGain = ctx.createGain();
+      ringGain.gain.value = 0;
+      carrier.connect(ringGain.gain);
+      input.connect(ringGain);
+      const wet = ctx.createGain(); wet.gain.value = 1;
+      const dry = ctx.createGain(); dry.gain.value = 0;
+      const out = ctx.createGain();
+      ringGain.connect(wet).connect(out);
+      input.connect(dry).connect(out);
+      return {
+        inputs: { in: { node: input, index: 0 } },
+        audioParams: { frequency: carrier.frequency },
+        output: out,
+        setParam(name, value) {
+          if (name === 'waveform') carrier.type = value;
+          else if (name === 'freq') carrier.frequency.setTargetAtTime(value, ctx.currentTime, 0.01);
+          else if (name === 'mix') { wet.gain.setTargetAtTime(value, ctx.currentTime, 0.01); dry.gain.setTargetAtTime(1 - value, ctx.currentTime, 0.01); }
+        },
+        dispose() {
+          try { carrier.stop(); } catch (e) {}
+          [carrier, input, ringGain, wet, dry, out].forEach((n) => n.disconnect());
+        },
+      };
+    },
+  },
+
+  gate: {
+    id: 'gate',
+    label: 'Gate',
+    category: 'processor',
+    color: '#F2A65A',
+    desc: 'ритм-чоппер / рейв-гейт',
+    inputs: [
+      { id: 'in', label: 'In', kind: 'audio' },
+      { id: 'rate_mod', label: 'Rate', kind: 'param', param: 'rate' },
+    ],
+    outputs: [{ id: 'out', label: 'Out' }],
+    params: [
+      { name: 'rate', label: 'Rate', type: 'range', min: 0.5, max: 32, step: 0.1, default: 8 },
+      { name: 'duty', label: 'Duty', type: 'range', min: 0.05, max: 0.95, step: 0.01, default: 0.5 },
+      { name: 'depth', label: 'Depth', type: 'range', min: 0, max: 1, step: 0.01, default: 1 },
+    ],
+    // The classic trance/rave gate: a sawtooth clock through a threshold
+    // WaveShaper becomes a variable-duty 0/1 pulse, scaled by -depth and
+    // summed onto the gain's own AudioParam (base 1) — swings the signal
+    // between silent and full on every cycle. Turn any sustained tone into a
+    // rhythmic chop without touching a keyboard.
+    build(ctx) {
+      const input = ctx.createGain();
+      const clock = ctx.createOscillator();
+      clock.type = 'sawtooth';
+      clock.frequency.value = 8;
+      clock.start();
+      const shaper = ctx.createWaveShaper();
+      shaper.curve = makeDutyCurve(0.5);
+      shaper.oversample = 'none';
+      const depthGain = ctx.createGain();
+      depthGain.gain.value = -1;
+      clock.connect(shaper).connect(depthGain);
+      const gateNode = ctx.createGain();
+      gateNode.gain.value = 1;
+      depthGain.connect(gateNode.gain);
+      input.connect(gateNode);
+      return {
+        inputs: { in: { node: input, index: 0 } },
+        audioParams: { rate: clock.frequency },
+        output: gateNode,
+        setParam(name, value) {
+          if (name === 'rate') clock.frequency.setTargetAtTime(value, ctx.currentTime, 0.01);
+          else if (name === 'duty') shaper.curve = makeDutyCurve(value);
+          else if (name === 'depth') depthGain.gain.setTargetAtTime(-value, ctx.currentTime, 0.01);
+        },
+        dispose() {
+          try { clock.stop(); } catch (e) {}
+          [input, clock, shaper, depthGain, gateNode].forEach((n) => n.disconnect());
+        },
+      };
+    },
+  },
+
+  field: {
+    id: 'field',
+    label: 'Field',
+    category: 'processor',
+    color: '#6FA8D8',
+    desc: 'ступенчатая стерео-панорама',
+    inputs: [
+      { id: 'in', label: 'In', kind: 'audio' },
+      { id: 'rate_mod', label: 'Rate', kind: 'param', param: 'rate' },
+    ],
+    outputs: [{ id: 'out', label: 'Out' }],
+    // A sine LFO through a staircase WaveShaper (same quantization curve as
+    // Crush, applied to a control signal instead of audio) drives the pan
+    // AudioParam, so position jumps between fixed steps instead of sweeping.
+    params: [
+      { name: 'rate', label: 'Rate', type: 'range', min: 0.02, max: 10, step: 0.01, default: 0.5 },
+      { name: 'steps', label: 'Steps', type: 'range', min: 2, max: 8, step: 1, default: 4 },
+      { name: 'depth', label: 'Depth', type: 'range', min: 0, max: 1, step: 0.01, default: 1 },
+    ],
+    build(ctx) {
+      const input = ctx.createGain();
+      const panner = ctx.createStereoPanner();
+      const lfo = ctx.createOscillator();
+      lfo.type = 'sine';
+      lfo.frequency.value = 0.5;
+      lfo.start();
+      const shaper = ctx.createWaveShaper();
+      shaper.curve = makeStepCurve(4);
+      shaper.oversample = 'none';
+      const depthGain = ctx.createGain();
+      depthGain.gain.value = 1;
+      lfo.connect(shaper).connect(depthGain).connect(panner.pan);
+      input.connect(panner);
+      return {
+        inputs: { in: { node: input, index: 0 } },
+        audioParams: { rate: lfo.frequency },
+        output: panner,
+        setParam(name, value) {
+          if (name === 'rate') lfo.frequency.setTargetAtTime(value, ctx.currentTime, 0.01);
+          else if (name === 'steps') shaper.curve = makeStepCurve(value);
+          else if (name === 'depth') depthGain.gain.setTargetAtTime(value, ctx.currentTime, 0.01);
+        },
+        dispose() {
+          try { lfo.stop(); } catch (e) {}
+          [input, panner, lfo, shaper, depthGain].forEach((n) => n.disconnect());
+        },
+      };
+    },
+  },
+
   reverb: {
     id: 'reverb',
     label: 'Reverb',
@@ -445,6 +826,58 @@ export const NODE_TYPES = {
           else if (name === 'mix') { wet.gain.setTargetAtTime(value, ctx.currentTime, 0.01); dry.gain.setTargetAtTime(1 - value, ctx.currentTime, 0.01); }
         },
         dispose() { [input, conv, wet, dry, out].forEach(n => n.disconnect()); },
+      };
+    },
+  },
+
+  shimmer: {
+    id: 'shimmer',
+    label: 'Shimmer',
+    category: 'processor',
+    color: '#B8A8D8',
+    desc: 'хорус',
+    inputs: [
+      { id: 'in', label: 'In', kind: 'audio' },
+      { id: 'rate_mod', label: 'Rate', kind: 'param', param: 'rate' },
+    ],
+    outputs: [{ id: 'out', label: 'Out' }],
+    // About as plain as a chorus circuit gets: a short (~18ms) delay, with a
+    // slow sine LFO wobbling delayTime itself rather than mixing in a second
+    // pitch-shifted voice — a time-varying delay is a disguised pitch shift.
+    params: [
+      { name: 'rate', label: 'Rate', type: 'range', min: 0.05, max: 5, step: 0.01, default: 0.5 },
+      { name: 'depth', label: 'Depth', type: 'range', min: 0, max: 1, step: 0.01, default: 0.5 },
+      { name: 'mix', label: 'Mix', type: 'range', min: 0, max: 1, step: 0.01, default: 0.45 },
+    ],
+    build(ctx) {
+      const input = ctx.createGain();
+      const delay = ctx.createDelay(1);
+      delay.delayTime.value = 0.018;
+      const lfo = ctx.createOscillator();
+      lfo.type = 'sine';
+      lfo.frequency.value = 0.5;
+      lfo.start();
+      const lfoDepth = ctx.createGain();
+      lfoDepth.gain.value = 0.005; // seconds of delay-time wobble at depth=0.5
+      lfo.connect(lfoDepth).connect(delay.delayTime);
+      const wet = ctx.createGain(); wet.gain.value = 0.45;
+      const dry = ctx.createGain(); dry.gain.value = 0.55;
+      const out = ctx.createGain();
+      input.connect(delay).connect(wet).connect(out);
+      input.connect(dry).connect(out);
+      return {
+        inputs: { in: { node: input, index: 0 } },
+        audioParams: { rate: lfo.frequency },
+        output: out,
+        setParam(name, value) {
+          if (name === 'rate') lfo.frequency.setTargetAtTime(value, ctx.currentTime, 0.01);
+          else if (name === 'depth') lfoDepth.gain.setTargetAtTime(value * 0.01, ctx.currentTime, 0.01);
+          else if (name === 'mix') { wet.gain.setTargetAtTime(value, ctx.currentTime, 0.01); dry.gain.setTargetAtTime(1 - value, ctx.currentTime, 0.01); }
+        },
+        dispose() {
+          try { lfo.stop(); } catch (e) {}
+          [input, delay, lfo, lfoDepth, wet, dry, out].forEach((n) => n.disconnect());
+        },
       };
     },
   },
@@ -486,6 +919,53 @@ export const NODE_TYPES = {
     },
   },
 
+  // ---------------- VIDEO ----------------
+
+  videoOutput: {
+    id: 'videoOutput',
+    label: 'Video Output',
+    category: 'video',
+    color: '#5CC9E8',
+    desc: 'осциллограф / видео выход',
+    inputs: [
+      { id: 'in1', label: 'In 1', kind: 'audio' },
+      { id: 'in2', label: 'In 2', kind: 'audio' },
+      { id: 'in3', label: 'In 3', kind: 'audio' },
+      { id: 'in4', label: 'In 4', kind: 'audio' },
+    ],
+    outputs: [],
+    params: [
+      { name: 'resolution', label: 'Res', type: 'select', options: ['320x240', '640x480', '1280x720', '1920x1080'], default: '640x480' },
+      { name: 'operation', label: 'Combine', type: 'select', options: ['add', 'sub', 'mul', 'min', 'max', 'avg'], default: 'add' },
+      { name: 'gain', label: 'Gain', type: 'range', min: 0, max: 4, step: 0.01, default: 1 },
+    ],
+    // Not an audio sink: no output port. Each connected input is tapped by its
+    // own analyser so the canvas renderer can read live time-domain data and,
+    // when 2+ inputs are patched in, combine them sample-wise with the same
+    // add/sub/mul/min/max/avg vocabulary as the Math node before drawing.
+    build(ctx) {
+      const analysers = [0, 1, 2, 3].map(() => {
+        const a = ctx.createAnalyser();
+        a.fftSize = 1024;
+        a.smoothingTimeConstant = 0;
+        return a;
+      });
+      return {
+        inputs: {
+          in1: { node: analysers[0], index: 0 },
+          in2: { node: analysers[1], index: 0 },
+          in3: { node: analysers[2], index: 0 },
+          in4: { node: analysers[3], index: 0 },
+        },
+        audioParams: {},
+        output: null,
+        analysers,
+        setParam() {}, // resolution/operation/gain are read live from patch state by the canvas renderer
+        dispose() { analysers.forEach((a) => a.disconnect()); },
+      };
+    },
+  },
+
   output: {
     id: 'output',
     label: 'Output',
@@ -512,7 +992,7 @@ export const NODE_TYPES = {
 };
 
 export function nodeTypesByCategory() {
-  const map = { generator: [], processor: [] };
+  const map = { generator: [], processor: [], video: [] };
   for (const t of Object.values(NODE_TYPES)) map[t.category].push(t);
   return map;
 }
