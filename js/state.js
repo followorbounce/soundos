@@ -19,7 +19,58 @@ function emit(kind, payload) {
   for (const fn of listeners) fn(kind, payload);
 }
 
+// Undo/redo: a stack of full-state snapshots, not per-field diffs — simplest
+// thing that can't go subtly wrong. addNode/removeNode/addEdge/removeEdge/
+// clearAll checkpoint themselves, since each is already exactly one discrete
+// user action. Continuous things — dragging a node, dragging a knob,
+// randomizing, applying a preset — are NOT auto-checkpointed here (that would
+// snapshot on every mousemove/every param in a batch); the code that starts
+// that continuous gesture calls checkpoint() itself, once, before the first
+// moveNode()/setParam() of the gesture.
+const HISTORY_LIMIT = 100;
+let history = [];
+let future = [];
+
+function snapshot() {
+  return JSON.stringify(serialize());
+}
+
+function restoreSnapshot(json) {
+  const data = JSON.parse(json);
+  state.nodes.clear();
+  state.edges.clear();
+  for (const n of data.nodes || []) state.nodes.set(n.id, n);
+  for (const e of data.edges || []) state.edges.set(e.id, e);
+  emit('load');
+}
+
+export function checkpoint() {
+  history.push(snapshot());
+  if (history.length > HISTORY_LIMIT) history.shift();
+  future = [];
+}
+
+export function resetHistory() {
+  history = [];
+  future = [];
+}
+
+export function undo() {
+  if (!history.length) return false;
+  future.push(snapshot());
+  restoreSnapshot(history.pop());
+  return true;
+}
+
+export function redo() {
+  if (!future.length) return false;
+  history.push(snapshot());
+  restoreSnapshot(future.pop());
+  return true;
+}
+
 export function addNode(typeId, x, y, defParams) {
+  checkpoint();
   const id = nextId('n');
   const params = {};
   for (const p of defParams) params[p.name] = p.default;
@@ -44,6 +95,7 @@ export function setBypassState(id, bypassed) {
 }
 
 export function removeNode(id) {
+  checkpoint();
   state.nodes.delete(id);
   for (const [eid, e] of state.edges) {
     if (e.from.nodeId === id || e.to.nodeId === id) state.edges.delete(eid);
@@ -78,6 +130,7 @@ export function addEdge(fromNodeId, fromPort, toNodeId, toPort) {
     )
       return null;
   }
+  checkpoint();
   const id = nextId('e');
   state.edges.set(id, { id, from: { nodeId: fromNodeId, port: fromPort }, to: { nodeId: toNodeId, port: toPort } });
   emit('edge-add', id);
@@ -85,11 +138,13 @@ export function addEdge(fromNodeId, fromPort, toNodeId, toPort) {
 }
 
 export function removeEdge(id) {
+  checkpoint();
   state.edges.delete(id);
   emit('edge-remove', id);
 }
 
 export function clearAll() {
+  checkpoint();
   state.nodes.clear();
   state.edges.clear();
   emit('clear');

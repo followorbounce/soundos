@@ -1,5 +1,5 @@
 import { NODE_TYPES } from './nodeLibrary.js';
-import { state, onChange, moveNode, removeNode, setParam, addEdge, removeEdge, toggleBypass, setBypassState } from './state.js';
+import { state, onChange, moveNode, removeNode, setParam, addEdge, removeEdge, toggleBypass, setBypassState, checkpoint, undo, redo } from './state.js';
 import { engine } from './audio/engine.js';
 
 const viewport = document.getElementById('canvas-viewport');
@@ -60,6 +60,7 @@ export function setScopeMode(mode) {
 // performance, same idea as Pulse Train's randomizer, but general-purpose
 // across whatever nodes happen to be patched in right now.
 export function randomizeAllParams() {
+  checkpoint();
   for (const node of state.nodes.values()) {
     const def = NODE_TYPES[node.typeId];
     if (!def) continue;
@@ -79,6 +80,7 @@ export function randomizeAllParams() {
 // 'tone2' or 'space' to the actual node id in the current patch, so this
 // works against whatever the starter rack currently is, not fixed ids.
 export function applyPreset(roles, params, bypass) {
+  checkpoint();
   for (const [role, values] of Object.entries(params || {})) {
     const id = roles[role];
     if (!id || !state.nodes.has(id)) continue;
@@ -236,6 +238,7 @@ function buildKnob(nodeId, def, node) {
   knob.addEventListener('mousedown', (e) => {
     e.preventDefault();
     e.stopPropagation();
+    checkpoint(); // once per drag, not once per mousemove (see the undo/redo note in state.js)
     const startY = e.clientY;
     const startValue = node.params[def.name];
     const onMove = (ev) => {
@@ -274,6 +277,7 @@ function buildSwitch(nodeId, def, node) {
   setEngaged(node.params[def.name]);
   sw.addEventListener('mousedown', (e) => e.stopPropagation());
   sw.addEventListener('click', () => {
+    checkpoint();
     const value = !node.params[def.name];
     setEngaged(value);
     onParamInput(nodeId, def.name, value);
@@ -295,7 +299,7 @@ function buildSelect(nodeId, def, node) {
     sel.appendChild(o);
   }
   sel.addEventListener('mousedown', (e) => e.stopPropagation());
-  sel.addEventListener('change', () => onParamInput(nodeId, def.name, sel.value));
+  sel.addEventListener('change', () => { checkpoint(); onParamInput(nodeId, def.name, sel.value); });
   wrap.appendChild(sel);
   return wrap;
 }
@@ -358,6 +362,7 @@ function renderNode(node) {
   bypassBtn.addEventListener('mousedown', (e) => e.stopPropagation());
   bypassBtn.addEventListener('click', (e) => {
     e.stopPropagation();
+    checkpoint();
     const bypassed = toggleBypass(node.id);
     bypassBtn.classList.toggle('engaged', !bypassed);
     el.classList.toggle('bypassed', bypassed);
@@ -446,6 +451,7 @@ function startNodeDrag(e, node) {
   e.preventDefault();
   e.stopPropagation();
   selectNode(node.id);
+  checkpoint(); // once per drag gesture (a plain click-no-drag just checkpoints a no-op, harmless)
   const startX = e.clientX, startY = e.clientY;
   const origX = node.x, origY = node.y;
   dragState = { node, startX, startY, origX, origY };
@@ -517,9 +523,24 @@ document.addEventListener('mousemove', (e) => {
 document.addEventListener('mouseup', () => { panState = null; });
 
 document.addEventListener('keydown', (e) => {
-  if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'SELECT') {
+  if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'SELECT') return;
+  if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) {
     removeNode(selectedId);
     selectedId = null;
+    return;
+  }
+  const mod = e.ctrlKey || e.metaKey;
+  if (mod && e.key.toLowerCase() === 'z') {
+    // undo()/redo() restore via the same 'load' event deserialize() uses,
+    // which the onChange listener below already re-renders on — no need to
+    // fullRender() again here.
+    e.preventDefault();
+    e.shiftKey ? redo() : undo();
+    return;
+  }
+  if (mod && e.key.toLowerCase() === 'y') {
+    e.preventDefault();
+    redo();
   }
 });
 

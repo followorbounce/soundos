@@ -1,6 +1,6 @@
 import { initCanvas, setScopeMode, randomizeAllParams, applyPreset, zoomTo, getZoom } from './canvas.js';
 import { initMenu } from './menu.js';
-import { state, addNode, addEdge, clearAll, setParam, onChange } from './state.js';
+import { state, addNode, addEdge, clearAll, setParam, onChange, resetHistory } from './state.js';
 import { NODE_TYPES } from './nodeLibrary.js';
 import { engine } from './audio/engine.js';
 import { exportPatch, importPatch } from './exporter.js';
@@ -192,4 +192,5 @@ initCanvas();
 if (state.nodes.size === 0) {
   seedDemoPatch();
   presetSelect.value = PRESETS[0].id;
+  resetHistory(); // building the starter rack shouldn't itself be undoable
 }
