@@ -87,17 +87,17 @@ function seedDemoPatch() {
 
 async function onGenerate() {
   if (![...state.nodes.values()].some((n) => n.typeId === 'output')) {
-    toast('Добавьте ноду Output, чтобы запустить осцилляцию', true);
+    toast('Add an Output node to start the oscillation', true);
     return;
   }
   btnGenerate.disabled = true;
   try {
     await engine.start();
     btnStop.disabled = false;
-    toast('Осцилляция запущена');
+    toast('Oscillation started');
   } catch (err) {
     console.error(err);
-    toast('Не удалось запустить аудио: ' + err.message, true);
+    toast('Could not start audio: ' + err.message, true);
   } finally {
     btnGenerate.disabled = false;
   }
@@ -131,7 +131,7 @@ speedReadout.addEventListener('click', () => {
 
 btnRandom.addEventListener('click', () => {
   randomizeAllParams();
-  toast('Ручки перемешаны');
+  toast('Knobs shuffled');
 });
 
 let scopeMode = 'wave';
@@ -173,14 +173,14 @@ fileImport.addEventListener('change', async () => {
   if (!file) return;
   try {
     await importPatch(file);
-    toast('Патч загружен');
+    toast('Patch loaded');
   } catch (err) {
-    toast('Ошибка загрузки файла: ' + err.message, true);
+    toast('Failed to load file: ' + err.message, true);
   }
   fileImport.value = '';
 });
 btnClear.addEventListener('click', () => {
-  if (confirm('Очистить весь патч?')) {
+  if (confirm('Clear the entire patch?')) {
     onStop();
     clearAll();
   }

@@ -89,9 +89,9 @@ function makeReverbImpulse(ctx, seconds, decay) {
 }
 
 export const CATEGORY = {
-  generator: { label: 'Генераторы' },
-  processor: { label: 'Обработка' },
-  video: { label: 'Видео' },
+  generator: { label: 'Generators' },
+  processor: { label: 'Processing' },
+  video: { label: 'Video' },
 };
 
 export const NODE_TYPES = {
@@ -102,7 +102,7 @@ export const NODE_TYPES = {
     label: 'Oscillator',
     category: 'generator',
     color: '#FF8C42',
-    desc: 'тон / VCO',
+    desc: 'tone / VCO',
     inputs: [
       { id: 'freq_mod', label: 'Freq', kind: 'param', param: 'frequency' },
       { id: 'detune_mod', label: 'Detune', kind: 'param', param: 'detune' },
@@ -144,7 +144,7 @@ export const NODE_TYPES = {
     label: 'LFO',
     category: 'generator',
     color: '#C9E85C',
-    desc: 'модуляция',
+    desc: 'modulation',
     inputs: [{ id: 'rate_mod', label: 'Rate', kind: 'param', param: 'frequency' }],
     outputs: [{ id: 'out', label: 'Out' }],
     params: [
@@ -189,7 +189,7 @@ export const NODE_TYPES = {
     label: 'Noise',
     category: 'generator',
     color: '#39CCCC',
-    desc: 'шум',
+    desc: 'noise',
     inputs: [],
     outputs: [{ id: 'out', label: 'Out' }],
     params: [
@@ -285,7 +285,7 @@ export const NODE_TYPES = {
     label: 'Rhythm',
     category: 'generator',
     color: '#FFD166',
-    desc: 'импульс / клок',
+    desc: 'impulse / clock',
     inputs: [{ id: 'rate_mod', label: 'Rate', kind: 'param', param: 'rate' }],
     outputs: [{ id: 'out', label: 'Out' }],
     params: [
@@ -347,7 +347,7 @@ export const NODE_TYPES = {
     label: 'Filter',
     category: 'processor',
     color: '#6FA98A',
-    desc: 'фильтр',
+    desc: 'filter',
     inputs: [
       { id: 'in', label: 'In', kind: 'audio' },
       { id: 'freq_mod', label: 'Cutoff', kind: 'param', param: 'frequency' },
@@ -383,7 +383,7 @@ export const NODE_TYPES = {
     label: 'Amp / VCA',
     category: 'processor',
     color: '#FF4136',
-    desc: 'усилитель',
+    desc: 'amplifier',
     inputs: [
       { id: 'in', label: 'In', kind: 'audio' },
       { id: 'gain_mod', label: 'Gain', kind: 'param', param: 'gain' },
@@ -410,7 +410,7 @@ export const NODE_TYPES = {
     label: 'Mixer',
     category: 'processor',
     color: '#D8D0C0',
-    desc: 'сумматор',
+    desc: 'summer',
     inputs: [{ id: 'in', label: 'In', kind: 'audio' }],
     outputs: [{ id: 'out', label: 'Out' }],
     params: [{ name: 'level', label: 'Level', type: 'range', min: 0, max: 1.5, step: 0.01, default: 1 }],
@@ -434,7 +434,7 @@ export const NODE_TYPES = {
     label: 'Delay',
     category: 'processor',
     color: '#7FB8D8',
-    desc: 'эхо',
+    desc: 'echo',
     inputs: [
       { id: 'in', label: 'In', kind: 'audio' },
       { id: 'time_mod', label: 'Time', kind: 'param', param: 'delayTime' },
@@ -479,7 +479,7 @@ export const NODE_TYPES = {
     label: 'Freeze',
     category: 'processor',
     color: '#5B8FA8',
-    desc: 'дилей, вытянутый почти до бесконечности',
+    desc: 'delay stretched toward infinity',
     inputs: [
       { id: 'in', label: 'In', kind: 'audio' },
       { id: 'time_mod', label: 'Time', kind: 'param', param: 'delayTime' },
@@ -525,7 +525,7 @@ export const NODE_TYPES = {
     label: 'Comb',
     category: 'processor',
     color: '#C97A4A',
-    desc: 'металлический резонатор',
+    desc: 'metallic resonator',
     inputs: [
       { id: 'in', label: 'In', kind: 'audio' },
       { id: 'freq_mod', label: 'Freq', kind: 'param', param: 'delayTime' },
@@ -574,7 +574,7 @@ export const NODE_TYPES = {
     label: 'Distortion',
     category: 'processor',
     color: '#E8547E',
-    desc: 'дисторшн',
+    desc: 'distortion',
     inputs: [{ id: 'in', label: 'In', kind: 'audio' }],
     outputs: [{ id: 'out', label: 'Out' }],
     params: [
@@ -609,7 +609,7 @@ export const NODE_TYPES = {
     label: 'Crush',
     category: 'processor',
     color: '#E0A458',
-    desc: 'битдробление',
+    desc: 'bit reduction',
     inputs: [{ id: 'in', label: 'In', kind: 'audio' }],
     outputs: [{ id: 'out', label: 'Out' }],
     params: [
@@ -646,7 +646,7 @@ export const NODE_TYPES = {
     label: 'Ring',
     category: 'processor',
     color: '#8B7FB8',
-    desc: 'кольцевая модуляция',
+    desc: 'ring modulation',
     inputs: [
       { id: 'in', label: 'In', kind: 'audio' },
       { id: 'freq_mod', label: 'Freq', kind: 'param', param: 'frequency' },
@@ -697,7 +697,7 @@ export const NODE_TYPES = {
     label: 'Gate',
     category: 'processor',
     color: '#F2A65A',
-    desc: 'ритм-чоппер / рейв-гейт',
+    desc: 'rhythm chopper / rave gate',
     inputs: [
       { id: 'in', label: 'In', kind: 'audio' },
       { id: 'rate_mod', label: 'Rate', kind: 'param', param: 'rate' },
@@ -751,7 +751,7 @@ export const NODE_TYPES = {
     label: 'Field',
     category: 'processor',
     color: '#6FA8D8',
-    desc: 'ступенчатая стерео-панорама',
+    desc: 'stepped stereo pan',
     inputs: [
       { id: 'in', label: 'In', kind: 'audio' },
       { id: 'rate_mod', label: 'Rate', kind: 'param', param: 'rate' },
@@ -801,7 +801,7 @@ export const NODE_TYPES = {
     label: 'Reverb',
     category: 'processor',
     color: '#6B6B8C',
-    desc: 'реверберация',
+    desc: 'reverberation',
     inputs: [{ id: 'in', label: 'In', kind: 'audio' }],
     outputs: [{ id: 'out', label: 'Out' }],
     params: [
@@ -835,7 +835,7 @@ export const NODE_TYPES = {
     label: 'Shimmer',
     category: 'processor',
     color: '#B8A8D8',
-    desc: 'хорус',
+    desc: 'chorus',
     inputs: [
       { id: 'in', label: 'In', kind: 'audio' },
       { id: 'rate_mod', label: 'Rate', kind: 'param', param: 'rate' },
@@ -887,7 +887,7 @@ export const NODE_TYPES = {
     label: 'Math',
     category: 'processor',
     color: '#C9A227',
-    desc: 'LFO×CV комбинатор',
+    desc: 'LFO×CV combiner',
     inputs: [
       { id: 'a', label: 'A', kind: 'audio' },
       { id: 'b', label: 'B', kind: 'audio' },
@@ -926,7 +926,7 @@ export const NODE_TYPES = {
     label: 'Video Output',
     category: 'video',
     color: '#5CC9E8',
-    desc: 'осциллограф / видео выход',
+    desc: 'oscilloscope / video output',
     inputs: [
       { id: 'in1', label: 'In 1', kind: 'audio' },
       { id: 'in2', label: 'In 2', kind: 'audio' },
@@ -971,7 +971,7 @@ export const NODE_TYPES = {
     label: 'Output',
     category: 'processor',
     color: '#F5F5F0',
-    desc: 'выход / мастер',
+    desc: 'output / master',
     inputs: [{ id: 'in', label: 'In', kind: 'audio' }],
     outputs: [],
     params: [{ name: 'volume', label: 'Vol', type: 'range', min: 0, max: 1, step: 0.01, default: 0.8 }],

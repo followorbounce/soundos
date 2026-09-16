@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -21,22 +21,22 @@
     <button id="btn-generate" class="btn btn-accent">Generate</button>
     <button id="btn-stop" class="btn" disabled>Stop</button>
     <span class="sep"></span>
-    <button id="btn-zoom-out" class="btn" title="Отдалить сетку">−</button>
-    <button id="zoom-readout" class="btn" title="Сбросить масштаб до 100%">100%</button>
-    <button id="btn-zoom-in" class="btn" title="Приблизить сетку">+</button>
+    <button id="btn-zoom-out" class="btn" title="Zoom out">−</button>
+    <button id="zoom-readout" class="btn" title="Reset zoom to 100%">100%</button>
+    <button id="btn-zoom-in" class="btn" title="Zoom in">+</button>
     <span class="sep"></span>
-    <label class="mini-label" title="Общая скорость воспроизведения всей сети: питчи/rate-параметры растут, тайминги (дилей/огибающая/реверб) сжимаются — как варispeed на плёнке">Speed
+    <label class="mini-label" title="Global playback speed for the whole network: pitches/rate params scale up, durations (delay/envelope/reverb) scale down — like varispeed on tape">Speed
       <input id="speed-slider" type="range" min="-2" max="2" step="0.01" value="0" />
     </label>
-    <button id="speed-readout" class="btn" title="Сбросить скорость до 100%">100%</button>
+    <button id="speed-readout" class="btn" title="Reset speed to 100%">100%</button>
     <span class="sep"></span>
-    <button id="btn-random" class="btn" title="Перемешать все ручки на холсте">⚄ Chance</button>
-    <select id="preset-select" class="btn" title="Пресеты настройки из Pulse Train — Stage II">
+    <button id="btn-random" class="btn" title="Randomize every knob on the board">⚄ Chance</button>
+    <select id="preset-select" class="btn" title="Tuning presets from Pulse Train — Stage II">
       <option value="">Presets…</option>
     </select>
     <button id="btn-scope-mode" class="btn">Scopes: Wave</button>
-    <button id="btn-compact" class="btn" title="Компактный вид: убрать осциллографы и сжать все ноды до минимального размера">Compact: Off</button>
-    <button id="btn-stage" class="btn" title="Полноэкранный режим для перформанса">⛶ Stage</button>
+    <button id="btn-compact" class="btn" title="Compact view: hide oscilloscopes and shrink every node to its tightest layout">Compact: Off</button>
+    <button id="btn-stage" class="btn" title="Fullscreen mode for performance">⛶ Stage</button>
     <span class="sep"></span>
     <button id="btn-export" class="btn">Export</button>
     <button id="btn-import" class="btn">Import</button>
@@ -56,7 +56,7 @@
 
   <aside id="node-menu" hidden>
     <div class="menu-head">
-      <input id="menu-search" type="text" placeholder="Найти ноду..." />
+      <input id="menu-search" type="text" placeholder="Find a node..." />
       <button id="menu-close" class="btn-icon">×</button>
     </div>
     <div id="menu-list" class="menu-list"></div>

@@ -11,7 +11,7 @@ export const PRESETS = [
   {
     id: 'unison-beat',
     name: 'Unison Beat — 4 Hz',
-    note: 'Tone и Tone II расходятся на 4 Гц — медленное биение в тета-диапазоне, та же интерференция, что стоит за монауральными и бинауральными биениями.',
+    note: 'Tone and Tone II are 4 Hz apart — a slow beat in the theta range, the same interference pattern behind monaural and binaural beating.',
     bypass: { tone2: false, rhythm: true, crush: true, ring: true, field: false, freeze: true, comb: true, space: false, drive: true, shimmer: true },
     params: {
       tone: { freq: 220, level: 0.7 },
@@ -24,7 +24,7 @@ export const PRESETS = [
   {
     id: 'perfect-fifth',
     name: 'Perfect Fifth — 3∶2',
-    note: 'Tone II зафиксирован на чистую квинту выше Tone (соотношение 3∶2, корень 196 Гц) — первый интервал за октавой, где два тона запираются в простое устойчивое отношение вместо ухода в дрейф.',
+    note: 'Tone II is locked a just fifth above Tone (ratio 3∶2, root 196 Hz) — the first interval past the octave where two tones lock into a simple, stable ratio instead of drifting.',
     bypass: { tone2: false, rhythm: true, crush: true, ring: true, field: false, freeze: true, comb: true, space: false, drive: true, shimmer: true },
     params: {
       tone: { freq: 196, level: 0.7 },
@@ -37,7 +37,7 @@ export const PRESETS = [
   {
     id: 'golden-ratio',
     name: 'Golden Ratio — φ',
-    note: 'Tone II стоит выше Tone в φ ≈ 1.618… раз — единственное отношение, гарантированно не запирающееся ни в какое простое целочисленное соотношение, поэтому биение между двумя тонами никогда не разрешается в устойчивый пульс.',
+    note: 'Tone II sits φ ≈ 1.618… times above Tone — the one ratio guaranteed not to lock into any simple integer relationship, so the beating between the two tones never resolves into a steady pulse.',
     bypass: { tone2: false, rhythm: true, crush: false, ring: false, field: false, freeze: false, comb: true, space: false, drive: true, shimmer: true },
     params: {
       tone: { freq: 220, level: 0.7 },
@@ -53,7 +53,7 @@ export const PRESETS = [
   {
     id: 'harmonic-series',
     name: 'Harmonic Series — 1∶2∶3∶4',
-    note: 'Tone на 110 Гц — основной тон; Tone II стоит ровно на октаву выше (2-я гармоника), Ring настроен на 3-ю, Comb — на 4-ю: аддитивный стек, стоящий за тембром любого высотного инструмента, разложенный по одной ноде на парциал.',
+    note: 'Tone at 110 Hz is the fundamental; Tone II sits exactly an octave up (2nd harmonic), Ring is tuned to the 3rd, Comb to the 4th — the additive stack behind the timbre of any pitched instrument, laid out one node per partial.',
     bypass: { tone2: false, rhythm: true, crush: true, ring: false, field: false, freeze: false, comb: false, space: false, drive: true, shimmer: true },
     params: {
       tone: { freq: 110, level: 0.72 },
@@ -69,7 +69,7 @@ export const PRESETS = [
   {
     id: 'tritone',
     name: 'Tritone — √2',
-    note: 'Tone II стоит ровно на полоктавы выше Tone (2^(6/12), равномерно темперированный тритон) — интервал без простого отношения, к которому можно свестись, неоднозначный так же, как неоднозначен «парадокс тритона».',
+    note: 'Tone II sits exactly half an octave above Tone (2^(6/12), the equal-tempered tritone) — an interval with no simple ratio to fall back on, ambiguous the same way the tritone paradox is ambiguous.',
     bypass: { tone2: false, rhythm: true, crush: true, ring: true, field: false, freeze: true, comb: true, space: false, drive: true, shimmer: true },
     params: {
       tone: { freq: 220, level: 0.7 },
@@ -82,7 +82,7 @@ export const PRESETS = [
   {
     id: 'pythagorean-comma',
     name: 'Pythagorean Comma',
-    note: 'Двенадцать сложенных чистых квинт должны вернуться в исходную высоту семью октавами выше — они промахиваются на (3∶2)¹²⁄2⁷, около 23.5 цента. Comb настроен на ту же разницу над Tone, так что несостыковка проявляется как медленное мерцание, а не ошибка округления.',
+    note: 'Twelve stacked just fifths should land back on the starting pitch seven octaves up — they miss by (3∶2)¹²⁄2⁷, about 23.5 cents. Comb is tuned to that same gap above Tone, so the mismatch shows up as a slow shimmer instead of a rounding error.',
     bypass: { tone2: true, rhythm: true, crush: true, ring: true, field: false, freeze: false, comb: false, space: false, drive: true, shimmer: true },
     params: {
       tone: { freq: 220, level: 0.72 },
@@ -97,7 +97,7 @@ export const PRESETS = [
   {
     id: 'critical-band',
     name: 'Critical Band Roughness',
-    note: 'Tone и Tone II стоят на равномерно темперированный полутон друг от друга на 440 Гц — достаточно близко, чтобы биение перестало звучать как ритм и стало звучать как жужжание — гельмгольцево объяснение диссонанса, сделанное слышимым.',
+    note: 'Tone and Tone II sit an equal-tempered semitone apart at 440 Hz — close enough that the beating stops sounding like rhythm and starts sounding like buzz, Helmholtz\'s account of dissonance made audible.',
     bypass: { tone2: false, rhythm: true, crush: true, ring: true, field: true, freeze: true, comb: true, space: false, drive: true, shimmer: true },
     params: {
       tone: { freq: 440, level: 0.7 },
@@ -109,7 +109,7 @@ export const PRESETS = [
   {
     id: 'fibonacci-pulse',
     name: 'Fibonacci Pulse',
-    note: 'Rate/decay Rhythm-ноды и битность Crush заданы числами Фибоначчи, а Comb настроен на 377 Гц — число Фибоначчи, работающее заодно резонансной частотой.',
+    note: 'Rhythm\'s rate/decay and Crush\'s bit depth are all set from Fibonacci numbers, and Comb is tuned to 377 Hz — a Fibonacci number doubling as a resonant frequency.',
     bypass: { tone2: true, rhythm: false, crush: false, ring: true, field: false, freeze: false, comb: false, space: false, drive: true, shimmer: true },
     params: {
       tone: { freq: 233, level: 0.75 },
@@ -126,7 +126,7 @@ export const PRESETS = [
   {
     id: 'driven-shimmer',
     name: 'Driven Shimmer',
-    note: 'Основной выход Tone II — не задействованный ни в одном другом пресете — наконец получает применение: через дисторшн Drive в модулированный дилей Shimmer, превращая чистую квинту над Tone в проведённое сквозь дисторшн хорусное марево.',
+    note: 'Tone II\'s main output — unused in every other preset — finally gets put to work: through Drive\'s saturation into Shimmer\'s modulated delay, turning a plain fifth above Tone into a driven, chorused wash.',
     bypass: { tone2: false, rhythm: true, crush: true, ring: true, field: false, freeze: true, comb: true, space: false, drive: false, shimmer: false },
     params: {
       tone: { freq: 196, level: 0.7 },

@@ -369,7 +369,7 @@ function renderNode(node) {
 
   const bypassBtn = document.createElement('button');
   bypassBtn.className = 'fswitch' + (node.bypassed ? '' : ' engaged');
-  bypassBtn.title = (def.id === 'videoOutput' ? 'Пауза видео: ' : 'Байпас: ') + def.label;
+  bypassBtn.title = (def.id === 'videoOutput' ? 'Pause video: ' : 'Bypass: ') + def.label;
   bypassBtn.appendChild(Object.assign(document.createElement('span'), { className: 'led' }));
   bypassBtn.addEventListener('mousedown', (e) => e.stopPropagation());
   bypassBtn.addEventListener('click', (e) => {
@@ -386,7 +386,7 @@ function renderNode(node) {
   const del = document.createElement('button');
   del.className = 'mdel';
   del.textContent = '×';
-  del.title = 'Удалить ноду';
+  del.title = 'Delete node';
   del.addEventListener('mousedown', (e) => e.stopPropagation());
   del.addEventListener('click', (e) => { e.stopPropagation(); removeNode(node.id); });
   head.appendChild(del);

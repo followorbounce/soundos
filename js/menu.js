@@ -72,7 +72,7 @@ function openGridPlacer(typeId) {
   gridOverlay.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
   const hint = document.createElement('div');
   hint.className = 'grid-hint';
-  hint.textContent = `Выберите место: ${NODE_TYPES[typeId].label} — ряд × столбец (Esc для отмены)`;
+  hint.textContent = `Pick a spot: ${NODE_TYPES[typeId].label} — row × column (Esc to cancel)`;
   gridOverlay.appendChild(hint);
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
