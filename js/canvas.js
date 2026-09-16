@@ -13,7 +13,17 @@ let wireDraft = null; // {fromNodeId, fromPort, x1, y1}
 let panState = null;
 let selectedId = null;
 let scopeMode = 'wave'; // 'wave' | 'spectrum' — global, toggled from the toolbar, same as Pulse Train's Scopes button
+let compactMode = false;
 const VIDEO_PORTS = ['in1', 'in2', 'in3', 'in4'];
+
+// Compact mode doesn't just hide the scope with CSS — renderNode() below
+// skips creating the scope canvas at all, and applies a `.compact` class
+// directly on each module (not a body-level ancestor class), so there's no
+// cascade/specificity path for this to silently not take effect.
+export function setCompactMode(on) {
+  compactMode = on;
+  fullRender();
+}
 
 // Canvas zoom: a CSS transform on #canvas-inner, scaled around its top-left
 // (transform-origin: 0 0). Node positions (node.x/node.y) and everything
@@ -344,6 +354,7 @@ function renderNode(node) {
   el.style.top = node.y + 'px';
   el.style.setProperty('--acc', def.color);
   el.classList.toggle('bypassed', !!node.bypassed);
+  el.classList.toggle('compact', compactMode);
   el.innerHTML = '';
 
   const head = document.createElement('div');
@@ -412,7 +423,7 @@ function renderNode(node) {
   }
   el.appendChild(body);
 
-  if (def.outputs.length) {
+  if (def.outputs.length && !compactMode) {
     const scopeWrap = document.createElement('div');
     scopeWrap.className = 'scopewrap';
     const canvas = document.createElement('canvas');

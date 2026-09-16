@@ -160,31 +160,33 @@ body{
 
 .mtest{margin-top:2px; font-size:9px; padding:3px 6px; align-self:flex-start;}
 
-/* Compact mode: not just "hide the scope" — every node shrinks to its
-   tightest layout (Video Output's own canvas stays, same reasoning as
-   before: it's the node's output, not incidental monitoring, and it can't
-   go fullscreen while display:none). Controls stay just big enough to grab
-   with a mouse; everything that's pure whitespace or secondary text goes. */
-body.compact-mode .scopewrap{display:none;}
-body.compact-mode .module{width:132px; padding:6px;}
-body.compact-mode .mtag{display:none;}
-body.compact-mode .mhead{padding-top:1px;}
-body.compact-mode .jackgroups{padding-bottom:4px;}
-body.compact-mode .jackcol{gap:3px;}
-body.compact-mode .jack{font-size:7.5px; gap:3px;}
-body.compact-mode .nub{width:9px; height:9px; border-width:1.5px;}
-body.compact-mode .mbody{padding-top:4px; gap:5px 4px;}
-body.compact-mode .knobwrap{width:28px; gap:1px;}
-body.compact-mode .knob{width:22px; height:22px;}
-body.compact-mode .knob::after{inset:4px;}
-body.compact-mode .knob .ind{top:2px; height:6px;}
-body.compact-mode .klabel{font-size:6.5px;}
-body.compact-mode .kval{font-size:7px;}
-body.compact-mode .switchwrap{width:26px; gap:2px;}
-body.compact-mode .fswitch{width:16px; height:16px; border-width:1.5px;}
-body.compact-mode .fswitch .led{width:5px; height:5px;}
-body.compact-mode .mselect{font-size:8.5px; padding:3px 4px;}
-body.compact-mode .mvideo-actions{margin-top:3px;}
+/* Compact mode: every node shrinks to its tightest layout. Scoped to the
+   `.compact` class on the module itself (set directly by renderNode() in
+   canvas.js, which also skips creating the scope canvas at all rather than
+   just hiding it) — not a body-level ancestor class, so there's no cascade
+   path for this to silently miss. Video Output's own canvas is untouched:
+   it's the node's actual output, not incidental monitoring, and it can't go
+   fullscreen while display:none. Controls stay just big enough to grab with
+   a mouse; everything that's pure whitespace or secondary text goes. */
+.module.compact{width:132px; padding:6px;}
+.module.compact .mtag{display:none;}
+.module.compact .mhead{padding-top:1px;}
+.module.compact .jackgroups{padding-bottom:4px;}
+.module.compact .jackcol{gap:3px;}
+.module.compact .jack{font-size:7.5px; gap:3px;}
+.module.compact .nub{width:9px; height:9px; border-width:1.5px;}
+.module.compact .mbody{padding-top:4px; gap:5px 4px;}
+.module.compact .knobwrap{width:28px; gap:1px;}
+.module.compact .knob{width:22px; height:22px;}
+.module.compact .knob::after{inset:4px;}
+.module.compact .knob .ind{top:2px; height:6px;}
+.module.compact .klabel{font-size:6.5px;}
+.module.compact .kval{font-size:7px;}
+.module.compact .switchwrap{width:26px; gap:2px;}
+.module.compact .fswitch{width:16px; height:16px; border-width:1.5px;}
+.module.compact .fswitch .led{width:5px; height:5px;}
+.module.compact .mselect{font-size:8.5px; padding:3px 4px;}
+.module.compact .mvideo-actions{margin-top:3px;}
 
 /* Node menu */
 #node-menu{

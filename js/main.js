@@ -1,4 +1,4 @@
-import { initCanvas, setScopeMode, randomizeAllParams, applyPreset, zoomTo, getZoom } from './canvas.js';
+import { initCanvas, setScopeMode, setCompactMode, randomizeAllParams, applyPreset, zoomTo, getZoom } from './canvas.js';
 import { initMenu } from './menu.js';
 import { state, addNode, addEdge, clearAll, setParam, onChange, resetHistory } from './state.js';
 import { NODE_TYPES } from './nodeLibrary.js';
@@ -11,7 +11,6 @@ const btnStop = document.getElementById('btn-stop');
 const btnZoomOut = document.getElementById('btn-zoom-out');
 const zoomReadout = document.getElementById('zoom-readout');
 const btnZoomIn = document.getElementById('btn-zoom-in');
-const btnKill = document.getElementById('btn-kill');
 const btnRandom = document.getElementById('btn-random');
 const presetSelect = document.getElementById('preset-select');
 const btnScopeMode = document.getElementById('btn-scope-mode');
@@ -114,10 +113,6 @@ btnZoomOut.addEventListener('click', () => zoomTo(getZoom() / 1.25));
 btnZoomIn.addEventListener('click', () => zoomTo(getZoom() * 1.25));
 zoomReadout.addEventListener('click', () => zoomTo(1));
 
-btnKill.addEventListener('mousedown', () => engine.setKill(true));
-btnKill.addEventListener('mouseup', () => engine.setKill(false));
-btnKill.addEventListener('mouseleave', () => engine.setKill(false));
-
 btnRandom.addEventListener('click', () => {
   randomizeAllParams();
   toast('Ручки перемешаны');
@@ -133,7 +128,7 @@ btnScopeMode.addEventListener('click', () => {
 let compactMode = false;
 btnCompact.addEventListener('click', () => {
   compactMode = !compactMode;
-  document.body.classList.toggle('compact-mode', compactMode);
+  setCompactMode(compactMode);
   btnCompact.textContent = compactMode ? 'Compact: On' : 'Compact: Off';
 });
 

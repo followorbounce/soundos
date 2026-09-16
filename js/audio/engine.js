@@ -36,7 +36,6 @@ export class SynthEngine {
   constructor() {
     this.ctx = null;
     this.master = null;
-    this.kill = null;
     this.compressor = null;
     this.instances = new Map(); // nodeId -> live instance, one single always-on graph
     this.workletReady = false;
@@ -50,10 +49,8 @@ export class SynthEngine {
     this.ctx = new (window.AudioContext || window.webkitAudioContext)();
     this.master = this.ctx.createGain();
     this.master.gain.value = 0;
-    this.kill = this.ctx.createGain();
-    this.kill.gain.value = 1;
     this.compressor = this.ctx.createDynamicsCompressor();
-    this.master.connect(this.kill).connect(this.compressor).connect(this.ctx.destination);
+    this.master.connect(this.compressor).connect(this.ctx.destination);
     await this.ctx.audioWorklet.addModule('js/audio/worklets/mathProcessor.js');
     this.workletReady = true;
   }
@@ -147,16 +144,6 @@ export class SynthEngine {
     }
   }
 
-  // Momentary mute-all — held, not toggled, the same gesture as a hand on a
-  // mixer's mute button. Lives on its own gain stage so it never fights the
-  // power on/off fade happening on `master` at the same time.
-  setKill(active) {
-    if (!this.ctx || !this.kill) return;
-    const now = this.ctx.currentTime;
-    this.kill.gain.cancelScheduledValues(now);
-    this.kill.gain.setTargetAtTime(active ? 0 : 1, now, 0.003);
-  }
-
   isLive() {
     return !!this.ctx && this.powered;
   }
@@ -183,7 +170,6 @@ export class SynthEngine {
       await this.ctx.close();
       this.ctx = null;
       this.master = null;
-      this.kill = null;
       this.compressor = null;
       this.workletReady = false;
     }
