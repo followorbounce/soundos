@@ -9,7 +9,7 @@ const svg = document.getElementById('wires-svg');
 
 const nodeEls = new Map(); // id -> element
 let dragState = null; // node drag
-let wireDraft = null; // {fromNodeId, fromPort, x1, y1}
+let wireDraft = null; // {fromNodeId, fromPort, x1, y1, x2, y2, snapTarget, snapEl} while dragging a new wire
 let panState = null;
 let selectedId = null;
 let scopeMode = 'wave'; // 'wave' | 'spectrum' — global, toggled from the toolbar, same as Pulse Train's Scopes button
@@ -330,10 +330,11 @@ function buildJack(nodeId, port, dir) {
   nub.dataset.dir = dir;
   const lbl = document.createElement('span');
   lbl.textContent = port.label;
+  // Starting a wire fires from the whole row (nub + label), not just the
+  // 11px dot — dropping one is handled globally in endWire() via a snap
+  // radius (see findNearestInJack), so 'in' jacks need no listener at all.
   if (dir === 'out') {
-    nub.addEventListener('mousedown', (e) => startWire(e, nodeId, port.id));
-  } else {
-    nub.addEventListener('mouseup', () => finishWire(nodeId, port.id));
+    jack.addEventListener('mousedown', (e) => startWire(e, nodeId, port.id));
   }
   jack.append(nub, lbl);
   return jack;
@@ -487,25 +488,55 @@ function startWire(e, nodeId, portId) {
   e.preventDefault();
   e.stopPropagation();
   const p = portPos(nodeId, portId, 'out');
-  wireDraft = { fromNodeId: nodeId, fromPort: portId, x1: p.x, y1: p.y, x2: p.x, y2: p.y };
+  wireDraft = { fromNodeId: nodeId, fromPort: portId, x1: p.x, y1: p.y, x2: p.x, y2: p.y, snapTarget: null, snapEl: null };
   document.addEventListener('mousemove', onWireMove);
-  document.addEventListener('mouseup', cancelWire);
+  document.addEventListener('mouseup', endWire);
 }
+
+// The actual 11px dot is a near-impossible drop target on its own — this
+// finds the closest 'in' jack within a fixed screen-pixel radius (constant
+// regardless of canvas zoom, since it's comparing real cursor position to
+// real rendered jack position) so releasing *near* a jack still connects,
+// the same "don't require pixel-perfect aim" fix already applied to
+// disconnecting a wire.
+const SNAP_RADIUS = 24;
+function findNearestInJack(clientX, clientY) {
+  let best = null, bestDist = SNAP_RADIUS;
+  for (const nub of nodesLayer.querySelectorAll('.nub[data-dir="in"]')) {
+    const r = nub.getBoundingClientRect();
+    const d = Math.hypot(clientX - (r.left + r.width / 2), clientY - (r.top + r.height / 2));
+    if (d < bestDist) { bestDist = d; best = nub; }
+  }
+  return best;
+}
+
 function onWireMove(e) {
   if (!wireDraft) return;
-  const p = screenToInner(e.clientX, e.clientY);
-  wireDraft.x2 = p.x; wireDraft.y2 = p.y;
+  const target = findNearestInJack(e.clientX, e.clientY);
+  if (wireDraft.snapEl && wireDraft.snapEl !== target) wireDraft.snapEl.classList.remove('jack-target');
+  if (target) {
+    target.classList.add('jack-target');
+    wireDraft.snapEl = target;
+    wireDraft.snapTarget = { nodeId: target.dataset.node, portId: target.dataset.port };
+    const p = portPos(target.dataset.node, target.dataset.port, 'in');
+    wireDraft.x2 = p.x; wireDraft.y2 = p.y;
+  } else {
+    wireDraft.snapEl = null;
+    wireDraft.snapTarget = null;
+    const p = screenToInner(e.clientX, e.clientY);
+    wireDraft.x2 = p.x; wireDraft.y2 = p.y;
+  }
   renderWires();
 }
-function finishWire(toNodeId, toPortId) {
-  if (!wireDraft) return;
-  addEdge(wireDraft.fromNodeId, wireDraft.fromPort, toNodeId, toPortId);
-  cancelWire();
-}
-function cancelWire() {
+
+function endWire() {
+  if (wireDraft) {
+    if (wireDraft.snapTarget) addEdge(wireDraft.fromNodeId, wireDraft.fromPort, wireDraft.snapTarget.nodeId, wireDraft.snapTarget.portId);
+    wireDraft.snapEl?.classList.remove('jack-target');
+  }
   wireDraft = null;
   document.removeEventListener('mousemove', onWireMove);
-  document.removeEventListener('mouseup', cancelWire);
+  document.removeEventListener('mouseup', endWire);
   renderWires();
 }
 

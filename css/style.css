@@ -117,12 +117,16 @@ body{
 .jackgroups{display:flex; justify-content:space-between; padding-bottom:7px;}
 .jackcol{display:flex; flex-direction:column; gap:4px; min-width:0;}
 .jackcol.out{align-items:flex-end;}
-.jack{display:flex; align-items:center; gap:5px; font-size:8.5px; letter-spacing:.02em; text-transform:uppercase; color:var(--ink-faint); font-family:var(--font);}
+.jack{display:flex; align-items:center; gap:5px; padding-block:2px; font-size:8.5px; letter-spacing:.02em; text-transform:uppercase; color:var(--ink-faint); font-family:var(--font); cursor:crosshair;}
 .jack.out{flex-direction:row-reverse;}
 .nub{width:11px; height:11px; border-radius:50%; flex:none; border:2px solid var(--acc); cursor:crosshair; background:var(--sunken);}
 .jack.out .nub{background:var(--acc);}
 .jack.cv .nub{border-style:dashed;}
 .nub:hover{box-shadow:0 0 0 3px rgba(245,245,240,.15);}
+/* While dragging a new wire, the closest 'in' jack within snap range lights
+   up — the wire will land here if the mouse is released right now, so you
+   don't need to hit the 11px dot itself. */
+.nub.jack-target{background:var(--ink); box-shadow:0 0 0 5px rgba(245,245,240,.4); border-color:var(--ink);}
 
 .mbody{
   display:flex; flex-wrap:wrap; gap:8px 6px; align-items:flex-start;
