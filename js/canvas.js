@@ -15,6 +15,43 @@ let selectedId = null;
 let scopeMode = 'wave'; // 'wave' | 'spectrum' — global, toggled from the toolbar, same as Pulse Train's Scopes button
 const VIDEO_PORTS = ['in1', 'in2', 'in3', 'in4'];
 
+// Canvas zoom: a CSS transform on #canvas-inner, scaled around its top-left
+// (transform-origin: 0 0). Node positions (node.x/node.y) and everything
+// drawn into the wires SVG stay in this untransformed "logical" coordinate
+// space — the transform is what makes it visually bigger/smaller. Anything
+// that mixes a raw mouse-screen delta with a logical coordinate (dragging a
+// node, drawing a wire, placing a new node from the menu) has to divide that
+// screen delta by `zoom` first, or it drifts out of sync with the cursor as
+// soon as zoom != 1.
+let zoom = 1;
+const ZOOM_MIN = 0.3, ZOOM_MAX = 2.5;
+
+export function getZoom() {
+  return zoom;
+}
+
+function applyZoom() {
+  inner.style.transform = `scale(${zoom})`;
+  const readout = document.getElementById('zoom-readout');
+  if (readout) readout.textContent = Math.round(zoom * 100) + '%';
+}
+
+// Zooms while keeping the logical point currently under (clientX, clientY)
+// visually fixed in place — the standard "zoom toward the cursor" feel.
+// Omit clientX/clientY to zoom around the current viewport center instead
+// (used by the toolbar +/- buttons, which have no cursor position of their own).
+export function zoomTo(newZoom, clientX, clientY) {
+  const rect = viewport.getBoundingClientRect();
+  const anchorX = clientX != null ? clientX - rect.left : viewport.clientWidth / 2;
+  const anchorY = clientY != null ? clientY - rect.top : viewport.clientHeight / 2;
+  const logicalX = (viewport.scrollLeft + anchorX) / zoom;
+  const logicalY = (viewport.scrollTop + anchorY) / zoom;
+  zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, newZoom));
+  applyZoom();
+  viewport.scrollLeft = logicalX * zoom - anchorX;
+  viewport.scrollTop = logicalY * zoom - anchorY;
+}
+
 export function setScopeMode(mode) {
   scopeMode = mode;
 }
@@ -59,9 +96,12 @@ export function applyPreset(roles, params, bypass) {
   fullRender();
 }
 
+// Both of these read real, on-screen (getBoundingClientRect) positions, which
+// are already scaled by the canvas zoom — dividing by `zoom` converts back
+// to the logical coordinate space that node.x/node.y and the wires SVG use.
 export function screenToInner(clientX, clientY) {
   const r = inner.getBoundingClientRect();
-  return { x: clientX - r.left, y: clientY - r.top };
+  return { x: (clientX - r.left) / zoom, y: (clientY - r.top) / zoom };
 }
 
 export function currentViewportCell() {
@@ -77,7 +117,7 @@ function portPos(nodeId, portId, dir) {
   if (!el) return null;
   const r = el.getBoundingClientRect();
   const innerR = inner.getBoundingClientRect();
-  return { x: r.left + r.width / 2 - innerR.left, y: r.top + r.height / 2 - innerR.top };
+  return { x: (r.left + r.width / 2 - innerR.left) / zoom, y: (r.top + r.height / 2 - innerR.top) / zoom };
 }
 
 function bezier(x1, y1, x2, y2) {
@@ -414,8 +454,10 @@ function startNodeDrag(e, node) {
 }
 function onNodeDragMove(e) {
   if (!dragState) return;
-  const dx = e.clientX - dragState.startX;
-  const dy = e.clientY - dragState.startY;
+  // Raw screen-pixel mouse delta -> logical canvas units, same conversion as
+  // screenToInner/portPos, or a node drifts away from the cursor once zoom != 1.
+  const dx = (e.clientX - dragState.startX) / zoom;
+  const dy = (e.clientY - dragState.startY) / zoom;
   moveNode(dragState.node.id, Math.max(0, dragState.origX + dx), Math.max(0, dragState.origY + dy));
 }
 function onNodeDragEnd() {
@@ -449,6 +491,15 @@ function cancelWire() {
   document.removeEventListener('mouseup', cancelWire);
   renderWires();
 }
+
+// Ctrl/Cmd + wheel zooms toward the cursor, same gesture as Figma/Google Maps.
+// Plain wheel keeps doing the browser's native scroll (pan), untouched.
+viewport.addEventListener('wheel', (e) => {
+  if (!e.ctrlKey && !e.metaKey) return;
+  e.preventDefault();
+  const factor = Math.exp(-e.deltaY * 0.002);
+  zoomTo(getZoom() * factor, e.clientX, e.clientY);
+}, { passive: false });
 
 // Pan the canvas by dragging empty background.
 viewport.addEventListener('mousedown', (e) => {

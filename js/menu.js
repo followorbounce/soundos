@@ -1,6 +1,6 @@
 import { NODE_TYPES, CATEGORY, nodeTypesByCategory } from './nodeLibrary.js';
 import { addNode } from './state.js';
-import { currentViewportCell } from './canvas.js';
+import { currentViewportCell, getZoom } from './canvas.js';
 
 const menuEl = document.getElementById('node-menu');
 const listEl = document.getElementById('menu-list');
@@ -49,7 +49,8 @@ function chooseType(typeId) {
     openGridPlacer(typeId);
   } else {
     const { scrollLeft, scrollTop } = currentViewportCell();
-    addNode(typeId, scrollLeft + 40 + Math.random() * 60, scrollTop + 40 + Math.random() * 60, NODE_TYPES[typeId].params);
+    const zoom = getZoom();
+    addNode(typeId, (scrollLeft + 40 + Math.random() * 60) / zoom, (scrollTop + 40 + Math.random() * 60) / zoom, NODE_TYPES[typeId].params);
   }
 }
 
@@ -79,8 +80,9 @@ function openGridPlacer(typeId) {
       cell.className = 'grid-cell';
       cell.textContent = `${r + 1}×${c + 1}`;
       cell.addEventListener('click', () => {
-        const x = scrollLeft + c * cellW + 16;
-        const y = scrollTop + r * cellH + 16;
+        const zoom = getZoom();
+        const x = (scrollLeft + c * cellW + 16) / zoom;
+        const y = (scrollTop + r * cellH + 16) / zoom;
         addNode(typeId, x, y, NODE_TYPES[typeId].params);
         closeGridPlacer();
       });

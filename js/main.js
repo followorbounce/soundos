@@ -1,4 +1,4 @@
-import { initCanvas, setScopeMode, randomizeAllParams, applyPreset } from './canvas.js';
+import { initCanvas, setScopeMode, randomizeAllParams, applyPreset, zoomTo, getZoom } from './canvas.js';
 import { initMenu } from './menu.js';
 import { state, addNode, addEdge, clearAll, setParam, onChange } from './state.js';
 import { NODE_TYPES } from './nodeLibrary.js';
@@ -8,10 +8,14 @@ import { PRESETS } from './presets.js';
 
 const btnGenerate = document.getElementById('btn-generate');
 const btnStop = document.getElementById('btn-stop');
+const btnZoomOut = document.getElementById('btn-zoom-out');
+const zoomReadout = document.getElementById('zoom-readout');
+const btnZoomIn = document.getElementById('btn-zoom-in');
 const btnKill = document.getElementById('btn-kill');
 const btnRandom = document.getElementById('btn-random');
 const presetSelect = document.getElementById('preset-select');
 const btnScopeMode = document.getElementById('btn-scope-mode');
+const btnCompact = document.getElementById('btn-compact');
 const btnStage = document.getElementById('btn-stage');
 const btnExport = document.getElementById('btn-export');
 const btnImport = document.getElementById('btn-import');
@@ -106,6 +110,10 @@ async function onStop() {
 btnGenerate.addEventListener('click', onGenerate);
 btnStop.addEventListener('click', onStop);
 
+btnZoomOut.addEventListener('click', () => zoomTo(getZoom() / 1.25));
+btnZoomIn.addEventListener('click', () => zoomTo(getZoom() * 1.25));
+zoomReadout.addEventListener('click', () => zoomTo(1));
+
 btnKill.addEventListener('mousedown', () => engine.setKill(true));
 btnKill.addEventListener('mouseup', () => engine.setKill(false));
 btnKill.addEventListener('mouseleave', () => engine.setKill(false));
@@ -120,6 +128,13 @@ btnScopeMode.addEventListener('click', () => {
   scopeMode = scopeMode === 'wave' ? 'spectrum' : 'wave';
   setScopeMode(scopeMode);
   btnScopeMode.textContent = scopeMode === 'wave' ? 'Scopes: Wave' : 'Scopes: Spectrum';
+});
+
+let compactMode = false;
+btnCompact.addEventListener('click', () => {
+  compactMode = !compactMode;
+  document.body.classList.toggle('compact-mode', compactMode);
+  btnCompact.textContent = compactMode ? 'Compact: On' : 'Compact: Off';
 });
 
 btnStage.addEventListener('click', () => {
