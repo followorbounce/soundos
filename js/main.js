@@ -11,6 +11,8 @@ const btnStop = document.getElementById('btn-stop');
 const btnZoomOut = document.getElementById('btn-zoom-out');
 const zoomReadout = document.getElementById('zoom-readout');
 const btnZoomIn = document.getElementById('btn-zoom-in');
+const speedSlider = document.getElementById('speed-slider');
+const speedReadout = document.getElementById('speed-readout');
 const btnRandom = document.getElementById('btn-random');
 const presetSelect = document.getElementById('preset-select');
 const btnScopeMode = document.getElementById('btn-scope-mode');
@@ -112,6 +114,20 @@ btnStop.addEventListener('click', onStop);
 btnZoomOut.addEventListener('click', () => zoomTo(getZoom() / 1.25));
 btnZoomIn.addEventListener('click', () => zoomTo(getZoom() * 1.25));
 zoomReadout.addEventListener('click', () => zoomTo(1));
+
+// Slider position is in octaves (-2..2), not a raw multiplier, so halving
+// and doubling the speed both feel like the same amount of drag either way —
+// speed = 2^octaves. Applies live via engine.setSpeed(), no rebuild needed.
+speedSlider.addEventListener('input', () => {
+  const speed = Math.pow(2, parseFloat(speedSlider.value));
+  engine.setSpeed(speed);
+  speedReadout.textContent = Math.round(speed * 100) + '%';
+});
+speedReadout.addEventListener('click', () => {
+  speedSlider.value = 0;
+  engine.setSpeed(1);
+  speedReadout.textContent = '100%';
+});
 
 btnRandom.addEventListener('click', () => {
   randomizeAllParams();

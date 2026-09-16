@@ -110,7 +110,7 @@ export const NODE_TYPES = {
     outputs: [{ id: 'out', label: 'Out' }],
     params: [
       { name: 'waveform', label: 'Wave', type: 'select', options: ['sine', 'square', 'sawtooth', 'triangle'], default: 'sine' },
-      { name: 'freq', label: 'Freq', type: 'range', min: 20, max: 2000, step: 1, default: 440 },
+      { name: 'freq', label: 'Freq', type: 'range', min: 20, max: 2000, step: 1, default: 440, scale: 'hz' },
       { name: 'level', label: 'Level', type: 'range', min: 0, max: 1, step: 0.01, default: 0.7 },
     ],
     build(ctx) {
@@ -149,7 +149,7 @@ export const NODE_TYPES = {
     outputs: [{ id: 'out', label: 'Out' }],
     params: [
       { name: 'waveform', label: 'Wave', type: 'select', options: ['sine', 'square', 'sawtooth', 'triangle'], default: 'sine' },
-      { name: 'rate', label: 'Rate', type: 'range', min: 0.02, max: 20, step: 0.01, default: 2 },
+      { name: 'rate', label: 'Rate', type: 'range', min: 0.02, max: 20, step: 0.01, default: 2, scale: 'hz' },
       { name: 'depth', label: 'Depth', type: 'range', min: 0, max: 1, step: 0.01, default: 1 },
       { name: 'unipolar', label: 'Unipolar', type: 'bool', default: false },
     ],
@@ -232,10 +232,10 @@ export const NODE_TYPES = {
     inputs: [],
     outputs: [{ id: 'out', label: 'Out' }],
     params: [
-      { name: 'attack', label: 'Atk', type: 'range', min: 0, max: 4, step: 0.01, default: 0.02 },
-      { name: 'decay', label: 'Dec', type: 'range', min: 0, max: 4, step: 0.01, default: 0.2 },
+      { name: 'attack', label: 'Atk', type: 'range', min: 0, max: 4, step: 0.01, default: 0.02, scale: 'time' },
+      { name: 'decay', label: 'Dec', type: 'range', min: 0, max: 4, step: 0.01, default: 0.2, scale: 'time' },
       { name: 'sustain', label: 'Sus', type: 'range', min: 0, max: 1, step: 0.01, default: 0.7 },
-      { name: 'release', label: 'Rel', type: 'range', min: 0, max: 4, step: 0.01, default: 0.3 },
+      { name: 'release', label: 'Rel', type: 'range', min: 0, max: 4, step: 0.01, default: 0.3, scale: 'time' },
       { name: 'amount', label: 'Amt', type: 'range', min: 0, max: 1, step: 0.01, default: 1 },
     ],
     build(ctx) {
@@ -289,7 +289,7 @@ export const NODE_TYPES = {
     inputs: [{ id: 'rate_mod', label: 'Rate', kind: 'param', param: 'rate' }],
     outputs: [{ id: 'out', label: 'Out' }],
     params: [
-      { name: 'rate', label: 'Rate', type: 'range', min: 0.25, max: 20, step: 0.05, default: 4 },
+      { name: 'rate', label: 'Rate', type: 'range', min: 0.25, max: 20, step: 0.05, default: 4, scale: 'hz' },
       { name: 'decay', label: 'Decay', type: 'range', min: 2, max: 40, step: 0.5, default: 12 },
       { name: 'tone', label: 'Tone', type: 'range', min: 200, max: 8000, step: 10, default: 1500 },
       { name: 'level', label: 'Level', type: 'range', min: 0, max: 1, step: 0.01, default: 0.6 },
@@ -356,7 +356,7 @@ export const NODE_TYPES = {
     outputs: [{ id: 'out', label: 'Out' }],
     params: [
       { name: 'type', label: 'Type', type: 'select', options: ['lowpass', 'highpass', 'bandpass', 'notch'], default: 'lowpass' },
-      { name: 'frequency', label: 'Cutoff', type: 'range', min: 20, max: 18000, step: 1, default: 1200 },
+      { name: 'frequency', label: 'Cutoff', type: 'range', min: 20, max: 18000, step: 1, default: 1200, scale: 'hz' },
       { name: 'q', label: 'Q', type: 'range', min: 0.1, max: 20, step: 0.1, default: 1 },
     ],
     build(ctx) {
@@ -441,7 +441,7 @@ export const NODE_TYPES = {
     ],
     outputs: [{ id: 'out', label: 'Out' }],
     params: [
-      { name: 'time', label: 'Time', type: 'range', min: 0, max: 2, step: 0.01, default: 0.3 },
+      { name: 'time', label: 'Time', type: 'range', min: 0, max: 2, step: 0.01, default: 0.3, scale: 'time' },
       { name: 'feedback', label: 'Fbck', type: 'range', min: 0, max: 0.95, step: 0.01, default: 0.35 },
       { name: 'mix', label: 'Mix', type: 'range', min: 0, max: 1, step: 0.01, default: 0.3 },
     ],
@@ -489,7 +489,7 @@ export const NODE_TYPES = {
     // the usual 80-90% an echo tops out at — a struck signal barely decays,
     // cycling almost indefinitely instead of fading into discrete repeats.
     params: [
-      { name: 'time', label: 'Time', type: 'range', min: 0, max: 3, step: 0.01, default: 0.6 },
+      { name: 'time', label: 'Time', type: 'range', min: 0, max: 3, step: 0.01, default: 0.6, scale: 'time' },
       { name: 'feedback', label: 'Fbck', type: 'range', min: 0, max: 0.99, step: 0.005, default: 0.9 },
       { name: 'mix', label: 'Mix', type: 'range', min: 0, max: 1, step: 0.01, default: 0.4 },
     ],
@@ -538,7 +538,7 @@ export const NODE_TYPES = {
     // instead nudges the raw delay time directly (same convention as
     // Delay/Freeze's own time_mod), not the frequency.
     params: [
-      { name: 'freq', label: 'Freq', type: 'range', min: 40, max: 4000, step: 1, default: 220 },
+      { name: 'freq', label: 'Freq', type: 'range', min: 40, max: 4000, step: 1, default: 220, scale: 'hz' },
       { name: 'resonance', label: 'Res', type: 'range', min: 0, max: 0.95, step: 0.01, default: 0.6 },
       { name: 'mix', label: 'Mix', type: 'range', min: 0, max: 1, step: 0.01, default: 0.5 },
     ],
@@ -654,7 +654,7 @@ export const NODE_TYPES = {
     outputs: [{ id: 'out', label: 'Out' }],
     params: [
       { name: 'waveform', label: 'Wave', type: 'select', options: ['sine', 'square', 'sawtooth', 'triangle'], default: 'sine' },
-      { name: 'freq', label: 'Freq', type: 'range', min: 20, max: 4000, step: 1, default: 220 },
+      { name: 'freq', label: 'Freq', type: 'range', min: 20, max: 4000, step: 1, default: 220, scale: 'hz' },
       { name: 'mix', label: 'Mix', type: 'range', min: 0, max: 1, step: 0.01, default: 1 },
     ],
     // True 4-quadrant ring mod: the carrier drives the input gain's own gain
@@ -704,7 +704,7 @@ export const NODE_TYPES = {
     ],
     outputs: [{ id: 'out', label: 'Out' }],
     params: [
-      { name: 'rate', label: 'Rate', type: 'range', min: 0.5, max: 32, step: 0.1, default: 8 },
+      { name: 'rate', label: 'Rate', type: 'range', min: 0.5, max: 32, step: 0.1, default: 8, scale: 'hz' },
       { name: 'duty', label: 'Duty', type: 'range', min: 0.05, max: 0.95, step: 0.01, default: 0.5 },
       { name: 'depth', label: 'Depth', type: 'range', min: 0, max: 1, step: 0.01, default: 1 },
     ],
@@ -761,7 +761,7 @@ export const NODE_TYPES = {
     // Crush, applied to a control signal instead of audio) drives the pan
     // AudioParam, so position jumps between fixed steps instead of sweeping.
     params: [
-      { name: 'rate', label: 'Rate', type: 'range', min: 0.02, max: 10, step: 0.01, default: 0.5 },
+      { name: 'rate', label: 'Rate', type: 'range', min: 0.02, max: 10, step: 0.01, default: 0.5, scale: 'hz' },
       { name: 'steps', label: 'Steps', type: 'range', min: 2, max: 8, step: 1, default: 4 },
       { name: 'depth', label: 'Depth', type: 'range', min: 0, max: 1, step: 0.01, default: 1 },
     ],
@@ -805,7 +805,7 @@ export const NODE_TYPES = {
     inputs: [{ id: 'in', label: 'In', kind: 'audio' }],
     outputs: [{ id: 'out', label: 'Out' }],
     params: [
-      { name: 'size', label: 'Size', type: 'range', min: 0.1, max: 5, step: 0.1, default: 2 },
+      { name: 'size', label: 'Size', type: 'range', min: 0.1, max: 5, step: 0.1, default: 2, scale: 'time' },
       { name: 'mix', label: 'Mix', type: 'range', min: 0, max: 1, step: 0.01, default: 0.3 },
     ],
     build(ctx) {
@@ -845,7 +845,7 @@ export const NODE_TYPES = {
     // slow sine LFO wobbling delayTime itself rather than mixing in a second
     // pitch-shifted voice — a time-varying delay is a disguised pitch shift.
     params: [
-      { name: 'rate', label: 'Rate', type: 'range', min: 0.05, max: 5, step: 0.01, default: 0.5 },
+      { name: 'rate', label: 'Rate', type: 'range', min: 0.05, max: 5, step: 0.01, default: 0.5, scale: 'hz' },
       { name: 'depth', label: 'Depth', type: 'range', min: 0, max: 1, step: 0.01, default: 0.5 },
       { name: 'mix', label: 'Mix', type: 'range', min: 0, max: 1, step: 0.01, default: 0.45 },
     ],

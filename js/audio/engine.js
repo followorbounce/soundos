@@ -9,6 +9,19 @@ import { state } from '../state.js';
 // teardown-and-retrigger — the whole point is that it oscillates permanently
 // once running, exactly like a hardware modular rig left patched and powered.
 
+// Global "speed" (varispeed): every param tagged scale:'hz' in nodeLibrary.js
+// (oscillator/LFO/clock pitches and rates) is multiplied by it, and every
+// scale:'time' param (delay/envelope/reverb durations) is divided by it — the
+// same thing that happens to a tape or a piece of film played back faster:
+// pitch goes up AND every duration gets proportionally shorter, together.
+// Untagged params (mix, resonance, bits, levels — anything dimensionless)
+// are left alone.
+function speedScale(paramDef, value, speed) {
+  if (paramDef.scale === 'hz') return value * speed;
+  if (paramDef.scale === 'time') return value / speed;
+  return value;
+}
+
 function wireEdge(instances) {
   for (const edge of state.edges.values()) {
     const fromInst = instances.get(edge.from.nodeId);
@@ -42,6 +55,7 @@ export class SynthEngine {
     this.scopeAnalysers = new Map(); // nodeId -> AnalyserNode, for the per-node waveform toggle
     this.bypass = new Map(); // nodeId -> {wet, dry} bypass-crossfade gains
     this.powered = false;
+    this.speed = 1; // global varispeed multiplier, see speedScale() above
   }
 
   async ensureContext() {
@@ -71,7 +85,7 @@ export class SynthEngine {
       const def = NODE_TYPES[node.typeId];
       if (!def) continue;
       const inst = def.build(this.ctx);
-      for (const p of def.params) inst.setParam(p.name, node.params[p.name] ?? p.default);
+      for (const p of def.params) inst.setParam(p.name, speedScale(p, node.params[p.name] ?? p.default, this.speed));
       this.instances.set(id, inst);
     }
     // Wrap every instance's own output in a bypass crossfade *before* wiring
@@ -176,7 +190,27 @@ export class SynthEngine {
   }
 
   updateParam(nodeId, name, value) {
-    this.instances.get(nodeId)?.setParam(name, value);
+    const node = state.nodes.get(nodeId);
+    const paramDef = node && NODE_TYPES[node.typeId]?.params.find((p) => p.name === name);
+    this.instances.get(nodeId)?.setParam(name, paramDef ? speedScale(paramDef, value, this.speed) : value);
+  }
+
+  // Live speed change — no rebuild, just re-applies every scale:'hz'/'time'
+  // param on every already-running instance at its new, scaled value. Each
+  // node's own setParam does the actual audio-thread ramp (setTargetAtTime),
+  // so this is as glitch-free as turning any other knob.
+  setSpeed(speed) {
+    this.speed = speed;
+    if (!this.ctx) return;
+    for (const [id, node] of state.nodes) {
+      const def = NODE_TYPES[node.typeId];
+      const inst = def && this.instances.get(id);
+      if (!inst) continue;
+      for (const p of def.params) {
+        if (!p.scale) continue;
+        inst.setParam(p.name, speedScale(p, node.params[p.name] ?? p.default, speed));
+      }
+    }
   }
 }
 
