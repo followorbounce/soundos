@@ -609,24 +609,35 @@ export const NODE_TYPES = {
     label: 'Crush',
     category: 'processor',
     color: '#E0A458',
-    desc: 'bit reduction',
+    desc: 'bit reduction · gate',
     inputs: [{ id: 'in', label: 'In', kind: 'audio' }],
     outputs: [{ id: 'out', label: 'Out' }],
     params: [
       { name: 'bits', label: 'Bits', type: 'range', min: 1, max: 16, step: 1, default: 6 },
+      { name: 'gate', label: 'Gate', type: 'range', min: 0.5, max: 200, step: 0.1, default: 20, scale: 'hz' },
       { name: 'mix', label: 'Mix', type: 'range', min: 0, max: 1, step: 0.01, default: 1 },
     ],
     // Amplitude quantization: Q(x,b) = round(x·2^(b-1)) / 2^(b-1), the same
-    // staircase-WaveShaper technique as Pulse Train's Crush node.
+    // staircase-WaveShaper technique as Pulse Train's Crush node. Gate is the
+    // same rave-style square-wave amplitude chop as Pulse Train Stage II's
+    // Crush: a square oscillator drives an audio-rate gain's own gain param,
+    // applied after the bit-crush and before the wet/dry mix.
     build(ctx) {
       const input = ctx.createGain();
       const shaper = ctx.createWaveShaper();
       shaper.curve = makeCrushCurve(6);
       shaper.oversample = 'none';
+      const gateOsc = ctx.createOscillator();
+      gateOsc.type = 'square';
+      gateOsc.frequency.value = 20;
+      const gate = ctx.createGain();
+      gate.gain.value = 0.5;
+      gateOsc.connect(gate.gain);
+      gateOsc.start();
       const wet = ctx.createGain(); wet.gain.value = 1;
       const dry = ctx.createGain(); dry.gain.value = 0;
       const out = ctx.createGain();
-      input.connect(shaper).connect(wet).connect(out);
+      input.connect(shaper).connect(gate).connect(wet).connect(out);
       input.connect(dry).connect(out);
       return {
         inputs: { in: { node: input, index: 0 } },
@@ -634,9 +645,13 @@ export const NODE_TYPES = {
         output: out,
         setParam(name, value) {
           if (name === 'bits') shaper.curve = makeCrushCurve(value);
+          else if (name === 'gate') gateOsc.frequency.setTargetAtTime(value, ctx.currentTime, 0.005);
           else if (name === 'mix') { wet.gain.setTargetAtTime(value, ctx.currentTime, 0.01); dry.gain.setTargetAtTime(1 - value, ctx.currentTime, 0.01); }
         },
-        dispose() { [input, shaper, wet, dry, out].forEach((n) => n.disconnect()); },
+        dispose() {
+          try { gateOsc.stop(); } catch (e) {}
+          [input, shaper, gateOsc, gate, wet, dry, out].forEach((n) => n.disconnect());
+        },
       };
     },
   },
