@@ -39,34 +39,45 @@ function toast(msg, isError = false) {
 
 // Starter rack mirroring Pulse Train — Stage II's own default board: same
 // 13 units (Tone/Tone II as two Oscillators, Rhythm, LFO, Crush, Ring, Field,
-// Freeze, Comb, Drive as Distortion, Shimmer, Space as Reverb, Output), same
-// five groups — laid out left to right (Sources -> Character -> Time -> Null
-// -> Output) so signal flow reads the way it's patched, not top to bottom.
-// All five chains land on a single Null junction (a passive unity-gain
-// pass-through, see nodeLibrary.js) before Output, rather than summing
-// directly on Output's own 'in' — a real pre-master junction point, in the
-// same spot the reference has nothing. The one simplification versus the
-// reference: our Oscillator has a single output, not two (a plain `out` and
-// a ratio-locked `out2`) — here Tone's own `out` is just patched to both of
-// its destinations instead.
+// Freeze, Comb, Drive as Distortion, Shimmer, Space as Reverb, Output), plus
+// a Null junction (a passive unity-gain pass-through, see nodeLibrary.js)
+// landing all five chains before Output rather than summing directly on
+// Output's own 'in' — a real pre-master junction point, in the same spot the
+// reference has nothing.
+//
+// Laid out as one lane per signal chain, not grouped by type: each node's x
+// is how many processing steps it sits from its own source, so a two-step
+// chain (Tone->Ring->Field) ends and turns toward Null/Output two columns
+// earlier than a three-step one (Tone->Crush->Comb->Space) — the cable for
+// the shorter chain just runs on a longer diagonal to get there, rather than
+// every node being padded out to a shared column. Rhythm has no processing
+// at all, so its cable is the longest diagonal of all, top-left corner
+// straight across to the junction. Y is grouped by lane: Rhythm alone on
+// top, then Tone's two chains (Ring/Field above, Crush/Comb/Space below,
+// Tone itself sitting at their midpoint so it fans out to both), then
+// Tone II's two chains the same way underneath. The one simplification
+// versus the reference: our Oscillator has a single output, not two (a
+// plain `out` and a ratio-locked `out2`) — here Tone's own `out` just feeds
+// both of its destinations instead.
 function seedDemoPatch() {
-  const tone = addNode('oscillator', 60, 60, NODE_TYPES.oscillator.params);
-  const tone2 = addNode('oscillator', 60, 460, NODE_TYPES.oscillator.params);
-  const rhythm = addNode('rhythm', 60, 860, NODE_TYPES.rhythm.params);
-  const lfo = addNode('lfo', 60, 1260, NODE_TYPES.lfo.params);
+  const tone = addNode('oscillator', 60, 360, NODE_TYPES.oscillator.params);
+  const tone2 = addNode('oscillator', 60, 760, NODE_TYPES.oscillator.params);
+  const rhythm = addNode('rhythm', 60, 60, NODE_TYPES.rhythm.params);
+  const lfo = addNode('lfo', 1260, 900, NODE_TYPES.lfo.params);
 
-  const crush = addNode('crush', 460, 60, NODE_TYPES.crush.params);
-  const ring = addNode('ring', 460, 460, NODE_TYPES.ring.params);
-  const drive = addNode('distortion', 460, 860, NODE_TYPES.distortion.params);
-  const field = addNode('field', 460, 1260, NODE_TYPES.field.params);
+  const ring = addNode('ring', 360, 260, NODE_TYPES.ring.params);
+  const crush = addNode('crush', 360, 460, NODE_TYPES.crush.params);
+  const freeze = addNode('freeze', 360, 660, NODE_TYPES.freeze.params);
+  const drive = addNode('distortion', 360, 860, NODE_TYPES.distortion.params);
 
-  const freeze = addNode('freeze', 860, 60, NODE_TYPES.freeze.params);
-  const comb = addNode('comb', 860, 460, NODE_TYPES.comb.params);
-  const shimmer = addNode('shimmer', 860, 860, NODE_TYPES.shimmer.params);
-  const space = addNode('reverb', 860, 1260, NODE_TYPES.reverb.params);
+  const field = addNode('field', 660, 260, NODE_TYPES.field.params);
+  const comb = addNode('comb', 660, 460, NODE_TYPES.comb.params);
+  const shimmer = addNode('shimmer', 660, 860, NODE_TYPES.shimmer.params);
 
-  const junction = addNode('nullNode', 1260, 660, NODE_TYPES.nullNode.params);
-  const output = addNode('output', 1660, 660, NODE_TYPES.output.params);
+  const space = addNode('reverb', 960, 460, NODE_TYPES.reverb.params);
+
+  const junction = addNode('nullNode', 1260, 460, NODE_TYPES.nullNode.params);
+  const output = addNode('output', 1560, 460, NODE_TYPES.output.params);
 
   roles = { tone, tone2, rhythm, lfo, crush, ring, drive, field, freeze, comb, shimmer, space, junction, output };
 
