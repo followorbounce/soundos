@@ -966,6 +966,35 @@ export const NODE_TYPES = {
     },
   },
 
+  nullNode: {
+    id: 'nullNode',
+    label: 'Null',
+    category: 'processor',
+    color: '#8A9199',
+    desc: 'passive summing junction',
+    // A plain unity-gain pass-through with no knobs at all — a neutral
+    // junction point to land several chains on before they reach Output,
+    // same idea as a "null" or "mult" utility module on a real rack.
+    // alwaysCompact means its card renders in the tightest layout
+    // (see renderNode() in canvas.js) no matter what the global Compact
+    // toggle is set to — there's nothing on it that compacting would hide.
+    alwaysCompact: true,
+    inputs: [{ id: 'in', label: 'In', kind: 'audio' }],
+    outputs: [{ id: 'out', label: 'Out' }],
+    params: [],
+    build(ctx) {
+      const g = ctx.createGain();
+      g.gain.value = 1;
+      return {
+        inputs: { in: { node: g, index: 0 } },
+        audioParams: {},
+        output: g,
+        setParam() {},
+        dispose() { g.disconnect(); },
+      };
+    },
+  },
+
   output: {
     id: 'output',
     label: 'Output',

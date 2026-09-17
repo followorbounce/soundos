@@ -178,10 +178,13 @@ body{
    `.compact` class on the module itself (set directly by renderNode() in
    canvas.js, which also skips creating the scope canvas at all rather than
    just hiding it) — not a body-level ancestor class, so there's no cascade
-   path for this to silently miss. Video Output's own canvas is untouched:
-   it's the node's actual output, not incidental monitoring, and it can't go
-   fullscreen while display:none. Controls stay just big enough to grab with
-   a mouse; everything that's pure whitespace or secondary text goes. */
+   path for this to silently miss. Two exceptions, both unconditional: Video
+   Output's own canvas is untouched (it's the node's actual output, not
+   incidental monitoring, and it can't go fullscreen while display:none),
+   and Output always gets its scope regardless of Compact (it's the master
+   signal). Null is always compact itself — it has nothing on it that
+   compacting would hide. Controls otherwise stay just big enough to grab
+   with a mouse; everything that's pure whitespace or secondary text goes. */
 .module.compact{width:132px; padding:6px;}
 .module.compact .mtag{display:none;}
 .module.compact .mhead{padding-top:1px;}
@@ -201,6 +204,9 @@ body{
 .module.compact .fswitch .led{width:5px; height:5px;}
 .module.compact .mselect{font-size:8.5px; padding:3px 4px;}
 .module.compact .mvideo-actions{margin-top:3px;}
+/* Output's scope is forced on even when its own card is compacted (see
+   renderNode()) — give it a shorter trace to match the tighter card. */
+.module.compact .scopewrap canvas{height:40px;}
 
 /* Node menu */
 #node-menu{

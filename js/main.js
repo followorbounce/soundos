@@ -40,45 +40,50 @@ function toast(msg, isError = false) {
 // Starter rack mirroring Pulse Train — Stage II's own default board: same
 // 13 units (Tone/Tone II as two Oscillators, Rhythm, LFO, Crush, Ring, Field,
 // Freeze, Comb, Drive as Distortion, Shimmer, Space as Reverb, Output), same
-// five groups, and the same default cabling — Output's own 'in' sums five
-// parallel chains directly, exactly like the reference, with no separate
-// Mixer node needed. The one simplification: our Oscillator has a single
-// output, where the reference's Tone/Tone II each have two (a plain `out`
-// and a ratio-locked `out2`) — here Tone's own `out` is just patched to both
-// of its destinations instead.
+// five groups — laid out left to right (Sources -> Character -> Time -> Null
+// -> Output) so signal flow reads the way it's patched, not top to bottom.
+// All five chains land on a single Null junction (a passive unity-gain
+// pass-through, see nodeLibrary.js) before Output, rather than summing
+// directly on Output's own 'in' — a real pre-master junction point, in the
+// same spot the reference has nothing. The one simplification versus the
+// reference: our Oscillator has a single output, not two (a plain `out` and
+// a ratio-locked `out2`) — here Tone's own `out` is just patched to both of
+// its destinations instead.
 function seedDemoPatch() {
   const tone = addNode('oscillator', 60, 60, NODE_TYPES.oscillator.params);
-  const tone2 = addNode('oscillator', 300, 60, NODE_TYPES.oscillator.params);
-  const rhythm = addNode('rhythm', 540, 60, NODE_TYPES.rhythm.params);
-  const lfo = addNode('lfo', 780, 60, NODE_TYPES.lfo.params);
+  const tone2 = addNode('oscillator', 60, 460, NODE_TYPES.oscillator.params);
+  const rhythm = addNode('rhythm', 60, 860, NODE_TYPES.rhythm.params);
+  const lfo = addNode('lfo', 60, 1260, NODE_TYPES.lfo.params);
 
-  const crush = addNode('crush', 60, 460, NODE_TYPES.crush.params);
-  const ring = addNode('ring', 300, 460, NODE_TYPES.ring.params);
-  const drive = addNode('distortion', 540, 460, NODE_TYPES.distortion.params);
-  const field = addNode('field', 780, 460, NODE_TYPES.field.params);
+  const crush = addNode('crush', 460, 60, NODE_TYPES.crush.params);
+  const ring = addNode('ring', 460, 460, NODE_TYPES.ring.params);
+  const drive = addNode('distortion', 460, 860, NODE_TYPES.distortion.params);
+  const field = addNode('field', 460, 1260, NODE_TYPES.field.params);
 
-  const freeze = addNode('freeze', 60, 860, NODE_TYPES.freeze.params);
-  const comb = addNode('comb', 300, 860, NODE_TYPES.comb.params);
-  const shimmer = addNode('shimmer', 540, 860, NODE_TYPES.shimmer.params);
-  const space = addNode('reverb', 780, 860, NODE_TYPES.reverb.params);
+  const freeze = addNode('freeze', 860, 60, NODE_TYPES.freeze.params);
+  const comb = addNode('comb', 860, 460, NODE_TYPES.comb.params);
+  const shimmer = addNode('shimmer', 860, 860, NODE_TYPES.shimmer.params);
+  const space = addNode('reverb', 860, 1260, NODE_TYPES.reverb.params);
 
-  const output = addNode('output', 400, 1260, NODE_TYPES.output.params);
+  const junction = addNode('nullNode', 1260, 660, NODE_TYPES.nullNode.params);
+  const output = addNode('output', 1660, 660, NODE_TYPES.output.params);
 
-  roles = { tone, tone2, rhythm, lfo, crush, ring, drive, field, freeze, comb, shimmer, space, output };
+  roles = { tone, tone2, rhythm, lfo, crush, ring, drive, field, freeze, comb, shimmer, space, junction, output };
 
   addEdge(tone, 'out', crush, 'in');
   addEdge(crush, 'out', comb, 'in');
   addEdge(comb, 'out', space, 'in');
-  addEdge(space, 'out', output, 'in');
+  addEdge(space, 'out', junction, 'in');
   addEdge(tone, 'out', ring, 'in');
   addEdge(ring, 'out', field, 'in');
-  addEdge(field, 'out', output, 'in');
-  addEdge(rhythm, 'out', output, 'in');
+  addEdge(field, 'out', junction, 'in');
+  addEdge(rhythm, 'out', junction, 'in');
   addEdge(tone2, 'out', freeze, 'in');
-  addEdge(freeze, 'out', output, 'in');
+  addEdge(freeze, 'out', junction, 'in');
   addEdge(tone2, 'out', drive, 'in');
   addEdge(drive, 'out', shimmer, 'in');
-  addEdge(shimmer, 'out', output, 'in');
+  addEdge(shimmer, 'out', junction, 'in');
+  addEdge(junction, 'out', output, 'in');
   // LFO is left unpatched, same as the reference — a CV source sitting ready
   // to be dragged onto any `_mod` jack during a set, not part of the fixed chain.
 

@@ -20,9 +20,49 @@ const VIDEO_PORTS = ['in1', 'in2', 'in3', 'in4'];
 // skips creating the scope canvas at all, and applies a `.compact` class
 // directly on each module (not a body-level ancestor class), so there's no
 // cascade/specificity path for this to silently not take effect.
+//
+// It also repacks the whole board: turning compact on snaps every node into
+// a tight grid (nearest-neighbor column clustering on current x, then
+// stacked by y within each column) instead of just shrinking cards and
+// leaving the old, wide gaps between them. The pre-compact positions are
+// remembered and restored exactly when compact turns back off.
+let expandedPositions = null; // Map<nodeId, {x, y}> captured just before packing
+
 export function setCompactMode(on) {
   compactMode = on;
+  if (on) packLayout(); else unpackLayout();
   fullRender();
+}
+
+const PACK_COL_GAP = 150, PACK_ROW_GAP = 112, PACK_MARGIN = 24, PACK_COL_TOLERANCE = 150;
+
+function packLayout() {
+  checkpoint();
+  expandedPositions = new Map();
+  for (const [id, node] of state.nodes) expandedPositions.set(id, { x: node.x, y: node.y });
+
+  const columns = [];
+  for (const node of [...state.nodes.values()].sort((a, b) => a.x - b.x)) {
+    let col = columns.find((c) => Math.abs(c.x - node.x) < PACK_COL_TOLERANCE);
+    if (!col) { col = { x: node.x, items: [] }; columns.push(col); }
+    col.items.push(node);
+  }
+  columns.sort((a, b) => a.x - b.x);
+  columns.forEach((col, ci) => {
+    col.items.sort((a, b) => a.y - b.y);
+    col.items.forEach((node, ri) => {
+      moveNode(node.id, PACK_MARGIN + ci * PACK_COL_GAP, PACK_MARGIN + ri * PACK_ROW_GAP);
+    });
+  });
+}
+
+function unpackLayout() {
+  if (!expandedPositions) return;
+  checkpoint();
+  for (const [id, pos] of expandedPositions) {
+    if (state.nodes.has(id)) moveNode(id, pos.x, pos.y);
+  }
+  expandedPositions = null;
 }
 
 // Canvas zoom: a CSS transform on #canvas-inner, scaled around its top-left
@@ -355,7 +395,7 @@ function renderNode(node) {
   el.style.top = node.y + 'px';
   el.style.setProperty('--acc', def.color);
   el.classList.toggle('bypassed', !!node.bypassed);
-  el.classList.toggle('compact', compactMode);
+  el.classList.toggle('compact', compactMode || !!def.alwaysCompact);
   el.innerHTML = '';
 
   const head = document.createElement('div');
@@ -424,7 +464,10 @@ function renderNode(node) {
   }
   el.appendChild(body);
 
-  if (def.outputs.length && !compactMode) {
+  // Output has no output port of its own (outputs:[]), so it never qualified
+  // for the ordinary per-node scope — it's the master signal, always worth
+  // seeing, so it gets one unconditionally, ignoring Compact entirely.
+  if ((def.outputs.length && !compactMode && !def.alwaysCompact) || def.id === 'output') {
     const scopeWrap = document.createElement('div');
     scopeWrap.className = 'scopewrap';
     const canvas = document.createElement('canvas');
