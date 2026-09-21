@@ -6,7 +6,7 @@ A browser-based modular synthesizer builder: assemble a patch from nodes, hit Ge
 
 - `index.html` — shell + toolbar (Generate/Stop, Speed, Compact, Scopes toggle, Chance, Stage, preset picker)
 - `css/` — visual styling
-- `js/nodeLibrary.js` — the node database: every node type's ports, params, and `build(ctx)` Web Audio factory. Adding a node type = adding one object here.
+- `js/nodeLibrary.js` — the node database: every node type's ports, params, and `build(ctx)` Web Audio factory. Adding a node type = adding one object here. A node def may set `wide: true` (352→392 px, two-column layout) and tag params with `group: 'Title'` to render section headers/columns (used by **NYX**, the 33-param Dreadbox NYX emulation; helpers `makePulseWave` for real PWM and `makeLoopEnvelope` = free-running looped AD buffer, crossfaded on rise/fall change).
 - `js/canvas.js` — the visual patch editor: pannable/zoomable canvas, SVG cables, drag/connect/disconnect, oscilloscopes, Compact layout
 - `js/audio/engine.js` — compiles the visual patch into one continuously-running Web Audio graph (no per-voice cloning)
 - `js/audio/worklets/mathProcessor.js` — AudioWorklet for the Math node (multiply/min/max need sample-by-sample math)

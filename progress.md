@@ -33,6 +33,8 @@
 
 - 2026-09-21 (later) — Default rack replaced with the user's own patch (screenshot): added a second Field (`field2`), rewired Field→Crush/Comb.freq_mod/Null, Drive→Field II. Its settings became a new first preset, 'Starter Network — 339∶363 Hz' (values read off the screenshot: e.g. Ring 1882 Hz/0.05, Field 8 steps, Crush 6 bit/189, Comb 1178 Hz bypassed), so the seed no longer holds any values; the nine older presets now also bypass Field II. Caveat: the Field→Comb.freq_mod cable is now part of every preset's patch.
 
+- 2026-09-21 (later) — New generator node **NYX** (digital Dreadbox NYX reissue: paraphonic 2-VCO + dual 12 dB filters with NOR/SPLIT/HALF/VCA routing, 3 looping AD envelopes, vibrato, noise, reverb; 33 params). Added generic `wide` nodes + `group` param sections to canvas/CSS. Verified in headless Firefox: audio flows, every routing/filter mode changes the sound, Env 1 modulates level (RMS 0.008↔0.277), no errors. Not modelled: hard sync, analog drift; ODD mode is a guess. Sources: Dreadbox NYX reissue coverage (Synth Anatomy, Perfect Circuit, Gearnews) — official manual pages weren't fetchable.
+
 ## Next steps (from README "Ideas for later")
 
 - Export a patch to a standalone HTML file that plays with no editor.

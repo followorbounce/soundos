@@ -349,6 +349,7 @@ function buildSelect(nodeId, def, node) {
   wrap.className = 'selectfield';
   const sel = document.createElement('select');
   sel.className = 'mselect';
+  sel.title = def.label;
   for (const opt of def.options) {
     const o = document.createElement('option');
     o.value = opt;
@@ -405,6 +406,7 @@ function renderNode(node) {
   el.style.setProperty('--acc', def.color);
   el.classList.toggle('bypassed', !!node.bypassed);
   el.classList.toggle('compact', compactMode || !!def.alwaysCompact);
+  el.classList.toggle('wide', !!def.wide);
   el.innerHTML = '';
   controlSync.set(node.id, new Map());
 
@@ -494,7 +496,23 @@ function renderNode(node) {
 
   const body = document.createElement('div');
   body.className = 'mbody';
-  for (const p of def.params) body.appendChild(paramControl(node.id, p, node));
+  // Params tagged with a `group` are wrapped one section per group (title + its
+  // controls), so a wide node can lay the sections out in columns.
+  let section = null;
+  let lastGroup = null;
+  for (const p of def.params) {
+    if (p.group && p.group !== lastGroup) {
+      section = document.createElement('div');
+      section.className = 'mgrp';
+      const gl = document.createElement('div');
+      gl.className = 'mgroup';
+      gl.textContent = p.group;
+      section.appendChild(gl);
+      body.appendChild(section);
+      lastGroup = p.group;
+    }
+    (p.group ? section : body).appendChild(paramControl(node.id, p, node));
+  }
   if (def.id === 'envelope') {
     const btn = document.createElement('button');
     btn.className = 'btn mtest';
