@@ -550,7 +550,9 @@ function paintLoopUi(nodeId) {
   recBtn.classList.toggle('engaged', st.recording);
   recBtn.title = st.recording
     ? 'Stop recording'
-    : `Record every change to this node's settings, including on/off (up to ${MAX_RECORD_MS / 1000} s; click again to stop)` + (st.hasLoop ? ' — replaces the saved loop' : '');
+    : st.hasLoop
+      ? `Record on top of the saved loop: it plays while you record, settings it never held are added as new tracks, and moving one it already holds replaces just that track (up to ${MAX_RECORD_MS / 1000} s; click again to stop)`
+      : `Record every change to this node's settings, including on/off (up to ${MAX_RECORD_MS / 1000} s; click again to stop)`;
   playBtn.classList.toggle('engaged', st.playing);
   playBtn.classList.toggle('empty', !st.hasLoop && !st.recording);
   playBtn.title = st.playing ? 'Stop the loop' : st.hasLoop ? 'Play the recorded settings in a loop' : 'Nothing recorded yet — press record first';
@@ -560,10 +562,12 @@ function paintLoopUi(nodeId) {
   bar.classList.toggle('recording', st.recording);
   bar.classList.toggle('playing', st.playing);
   bar.classList.toggle('trimmable', st.hasLoop && !st.recording);
-  // Window position on the take's timeline (the whole bar while recording).
-  const total = st.hasLoop && !st.recording ? st.loopDuration : 1;
-  const a = st.hasLoop && !st.recording ? st.trimStart / total : 0;
-  const z = st.hasLoop && !st.recording ? st.trimEnd / total : 1;
+  // Window position on the take's timeline (the whole bar while recording fresh;
+  // an overdub keeps showing the window it is looping).
+  const showWin = st.hasLoop && (!st.recording || st.overdub);
+  const total = showWin ? st.loopDuration : 1;
+  const a = showWin ? st.trimStart / total : 0;
+  const z = showWin ? st.trimEnd / total : 1;
   win.style.left = a * 100 + '%';
   win.style.width = (z - a) * 100 + '%';
   bar.style.setProperty('--ts', a * 100 + '%');
@@ -572,7 +576,7 @@ function paintLoopUi(nodeId) {
     void fill.offsetWidth; // restart the CSS animation
     // Negative delay: after a re-render mid-loop, resume at the true phase instead of from zero.
     const phase = (performance.now() - st.startedAt) % st.duration;
-    fill.style.animation = `loopfill ${st.duration}ms linear ${-phase}ms ${st.recording ? '1 forwards' : 'infinite'}`;
+    fill.style.animation = `loopfill ${st.duration}ms linear ${-phase}ms ${st.recording && !st.overdub ? '1 forwards' : 'infinite'}`;
   }
 }
 

@@ -28,6 +28,8 @@
 
 - 2026-09-19 — Added a Cloudflare Web Analytics beacon (cross-repo rollout across every deployed followorbounce/client site). See [[cloudflare-analytics-setup]] in the assistant's memory for the account/token map.
 
+- 2026-09-21 — Overdub recording + Clear takes. Record on a node with a saved take now plays that take and layers on it: new settings become parallel tracks, touching a recorded setting replaces only its track. New toolbar button **Clear takes** erases every node's loops (confirm; not undoable, loops are outside undo). Verified in headless Firefox by driving `recorder.js` (add track, replace track, clear).
+
 ## Next steps (from README "Ideas for later")
 
 - Export a patch to a standalone HTML file that plays with no editor.

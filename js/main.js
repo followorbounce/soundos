@@ -1,6 +1,7 @@
 import { initCanvas, setScopeMode, setCompactMode, randomizeAllParams, applyPreset, zoomTo, getZoom } from './canvas.js';
 import { initMenu } from './menu.js';
-import { state, addNode, addEdge, clearAll, setParam, onChange, resetHistory } from './state.js';
+import { clearAllRecordings } from './recorder.js';
+import { state, loops, addNode, addEdge, clearAll, setParam, onChange, resetHistory } from './state.js';
 import { NODE_TYPES } from './nodeLibrary.js';
 import { engine } from './audio/engine.js';
 import { exportPatch, importPatch } from './exporter.js';
@@ -22,6 +23,7 @@ const btnExport = document.getElementById('btn-export');
 const btnImport = document.getElementById('btn-import');
 const fileImport = document.getElementById('file-import');
 const btnClear = document.getElementById('btn-clear');
+const btnClearTakes = document.getElementById('btn-clear-takes');
 const toastStack = document.getElementById('toast-stack');
 
 // Role -> node id for whatever the current starter rack is, so presets (and
@@ -194,6 +196,12 @@ fileImport.addEventListener('change', async () => {
     toast('Failed to load file: ' + err.message, true);
   }
   fileImport.value = '';
+});
+btnClearTakes.addEventListener('click', () => {
+  if (!loops.size) { toast('No recordings to clear'); return; }
+  if (!confirm(`Erase all recordings (${loops.size} node${loops.size === 1 ? '' : 's'}) in every node? This cannot be undone.`)) return;
+  clearAllRecordings();
+  toast('All recordings cleared');
 });
 btnClear.addEventListener('click', () => {
   if (confirm('Clear the entire patch?')) {
