@@ -1,6 +1,7 @@
 import { NODE_TYPES } from './nodeLibrary.js';
 import { state, onChange, moveNode, removeNode, setParam, addEdge, removeEdge, toggleBypass, setBypassState, checkpoint, undo, redo } from './state.js';
 import { engine } from './audio/engine.js';
+import { toggleRecord, togglePlay, getStatus, setApplyHook, setStatusHook, MAX_RECORD_MS } from './recorder.js';
 
 const viewport = document.getElementById('canvas-viewport');
 const inner = document.getElementById('canvas-inner');
@@ -8,6 +9,10 @@ const nodesLayer = document.getElementById('nodes-layer');
 const svg = document.getElementById('wires-svg');
 
 const nodeEls = new Map(); // id -> element
+// nodeId -> Map(paramName -> fn(value)) that repaints that control's own visuals.
+// Loop playback (recorder.js) changes params without the user touching the
+// controls, so it needs a way to move the knobs/switches/selects on screen.
+const controlSync = new Map();
 let dragState = null; // node drag
 let wireDraft = null; // {fromNodeId, fromPort, x1, y1, x2, y2, snapTarget, snapEl} while dragging a new wire
 let panState = null;
@@ -284,6 +289,7 @@ function buildKnob(nodeId, def, node) {
     kval.textContent = fmt(value);
   };
   apply(node.params[def.name]);
+  controlSync.get(nodeId).set(def.name, apply);
 
   knob.addEventListener('mousedown', (e) => {
     e.preventDefault();
@@ -325,6 +331,7 @@ function buildSwitch(nodeId, def, node) {
   sw.appendChild(led);
   const setEngaged = (on) => sw.classList.toggle('engaged', !!on);
   setEngaged(node.params[def.name]);
+  controlSync.get(nodeId).set(def.name, setEngaged);
   sw.addEventListener('mousedown', (e) => e.stopPropagation());
   sw.addEventListener('click', () => {
     checkpoint();
@@ -348,6 +355,7 @@ function buildSelect(nodeId, def, node) {
     if (opt === node.params[def.name]) o.selected = true;
     sel.appendChild(o);
   }
+  controlSync.get(nodeId).set(def.name, (value) => { sel.value = value; });
   sel.addEventListener('mousedown', (e) => e.stopPropagation());
   sel.addEventListener('change', () => { checkpoint(); onParamInput(nodeId, def.name, sel.value); });
   wrap.appendChild(sel);
@@ -397,6 +405,7 @@ function renderNode(node) {
   el.classList.toggle('bypassed', !!node.bypassed);
   el.classList.toggle('compact', compactMode || !!def.alwaysCompact);
   el.innerHTML = '';
+  controlSync.set(node.id, new Map());
 
   const head = document.createElement('div');
   head.className = 'mhead';
@@ -405,6 +414,7 @@ function renderNode(node) {
   const name = document.createElement('span');
   name.className = 'mname';
   name.textContent = def.label;
+  name.title = def.label;
   headLeft.appendChild(name);
 
   const bypassBtn = document.createElement('button');
@@ -421,6 +431,23 @@ function renderNode(node) {
     if (engine.isLive()) engine.setBypass(node.id, bypassed);
   });
   headLeft.appendChild(bypassBtn);
+  if (def.params.length) {
+    const recBtn = document.createElement('button');
+    recBtn.className = 'fswitch loopbtn rec';
+    const playBtn = document.createElement('button');
+    playBtn.className = 'fswitch loopbtn play';
+    for (const b of [recBtn, playBtn]) {
+      b.appendChild(Object.assign(document.createElement('span'), { className: 'glyph' }));
+      b.addEventListener('mousedown', (e) => e.stopPropagation());
+    }
+    recBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleRecord(node.id); });
+    playBtn.addEventListener('click', (e) => { e.stopPropagation(); togglePlay(node.id); });
+    headLeft.append(recBtn, playBtn);
+    const bar = document.createElement('div');
+    bar.className = 'loopbar';
+    bar.appendChild(document.createElement('i'));
+    head.appendChild(bar);
+  }
   head.appendChild(headLeft);
 
   const del = document.createElement('button');
@@ -495,7 +522,46 @@ function renderNode(node) {
   }
 
   el.addEventListener('mousedown', () => selectNode(node.id));
+  paintLoopUi(node.id);
 }
+
+// Repaints one node's Record/Play buttons and the progress bar under its
+// header from the recorder's current status. Called after every render of the
+// node (renders rebuild the DOM) and whenever recorder.js reports a change.
+function paintLoopUi(nodeId) {
+  const el = nodeEls.get(nodeId);
+  if (!el) return;
+  const recBtn = el.querySelector('.loopbtn.rec');
+  const playBtn = el.querySelector('.loopbtn.play');
+  const bar = el.querySelector('.loopbar');
+  if (!recBtn || !playBtn || !bar) return;
+  const st = getStatus(nodeId);
+  recBtn.classList.toggle('engaged', st.recording);
+  recBtn.title = st.recording
+    ? 'Stop recording'
+    : `Record every change to this node's settings (up to ${MAX_RECORD_MS / 1000} s)` + (st.hasLoop ? ' — replaces the saved loop' : '');
+  playBtn.classList.toggle('engaged', st.playing);
+  playBtn.classList.toggle('empty', !st.hasLoop && !st.recording);
+  playBtn.title = st.playing ? 'Stop the loop' : st.hasLoop ? 'Play the recorded settings in a loop' : 'Nothing recorded yet — press record first';
+  const fill = bar.firstChild;
+  fill.style.animation = 'none';
+  bar.classList.toggle('recording', st.recording);
+  bar.classList.toggle('playing', st.playing);
+  if (st.recording || st.playing) {
+    void fill.offsetWidth; // restart the CSS animation
+    // Negative delay: after a re-render mid-loop, resume at the true phase instead of from zero.
+    const phase = (performance.now() - st.startedAt) % st.duration;
+    fill.style.animation = `loopfill ${st.duration}ms linear ${-phase}ms ${st.recording ? '1 forwards' : 'infinite'}`;
+  }
+}
+
+setStatusHook(paintLoopUi);
+// Loop playback pushes values through the same path a knob drag uses (state +
+// live audio + Video Output resolution), then repaints the control itself.
+setApplyHook((nodeId, name, value) => {
+  onParamInput(nodeId, name, value);
+  controlSync.get(nodeId)?.get(name)?.(value);
+});
 
 function selectNode(id) {
   selectedId = id;
@@ -726,7 +792,7 @@ function tickScopes() {
 
 function fullRender() {
   for (const id of [...nodeEls.keys()]) {
-    if (!state.nodes.has(id)) { nodeEls.get(id).remove(); nodeEls.delete(id); }
+    if (!state.nodes.has(id)) { nodeEls.get(id).remove(); nodeEls.delete(id); controlSync.delete(id); }
   }
   for (const node of state.nodes.values()) renderNode(node);
   svg.setAttribute('width', inner.offsetWidth);
@@ -735,7 +801,7 @@ function fullRender() {
 }
 
 onChange((kind, payload) => {
-  if (kind === 'param-change') return; // params re-render locally, no full redraw needed
+  if (kind === 'param-change' || kind === 'loop-change') return; // params/loops repaint locally, no full redraw needed
   if (kind === 'node-move') {
     // Fast path: dragging fires on every mousemove, avoid rebuilding all DOM.
     const el = nodeEls.get(payload);

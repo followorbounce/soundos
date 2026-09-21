@@ -12,7 +12,8 @@ A browser-based modular synthesizer builder: assemble a patch from nodes, hit Ge
 - `js/audio/worklets/mathProcessor.js` — AudioWorklet for the Math node (multiply/min/max need sample-by-sample math)
 - `js/menu.js` — node-picker menu (search, desktop grid placement / mobile auto-placement)
 - `js/presets.js` — tuning presets ported from Pulse Train — Stage II, applied by node role
-- `js/state.js` — patch state + undo/redo (full JSON snapshots, checkpointed per gesture not per frame)
+- `js/state.js` — patch state + undo/redo (full JSON snapshots, checkpointed per gesture not per frame); also holds `loops` (recorded parameter takes), kept OUT of undo snapshots on purpose and included in export/import
+- `js/recorder.js` — per-node live taping: Record (≤4 s, driven off the `param-change` event) and Play-loop buttons in each node header; playback replays through canvas.js's own param path with an `applying` guard so replayed moves aren't re-recorded
 - `js/main.js` — wiring + `seedDemoPatch` starter rack
 - `js/exporter.js` — JSON patch export/import
 

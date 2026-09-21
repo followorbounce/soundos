@@ -108,10 +108,10 @@ body{
 .module.selected{outline:2px dashed var(--ink); outline-offset:2px;}
 .module.bypassed{opacity:.55;}
 
-.mhead{display:flex; align-items:center; justify-content:space-between; padding-top:3px; cursor:grab;}
+.mhead{display:flex; align-items:center; justify-content:space-between; padding-top:3px; cursor:grab; position:relative;}
 .mhead:active{cursor:grabbing;}
-.mhead-left{display:flex; align-items:center; gap:7px; min-width:0;}
-.mname{font-family:var(--font); font-weight:700; font-size:12.5px; letter-spacing:.04em; text-transform:uppercase; color:var(--acc);}
+.mhead-left{display:flex; align-items:center; gap:3px; min-width:0;}
+.mname{min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-family:var(--font); font-weight:700; font-size:11px; letter-spacing:.01em; text-transform:uppercase; color:var(--acc);}
 .mdel{background:none; border:none; color:var(--ink-faint); opacity:.7; cursor:pointer; font-size:13px; line-height:1; font-family:var(--font);}
 .mdel:hover{opacity:1; color:var(--ink);}
 .scopewrap{margin-top:7px; border:1px solid var(--line-strong); border-radius:3px; overflow:hidden; background:#000;}
@@ -165,6 +165,25 @@ body{
 .fswitch.engaged{border-color:var(--acc);}
 .fswitch.engaged .led{background:var(--acc); box-shadow:0 0 4px 0 var(--led-glow);}
 
+/* Live taping: Record / Play-loop buttons beside the bypass switch. Built on
+   .fswitch so they share its size and compact scaling; glyphs are pure CSS. */
+.loopbtn{width:16px; height:16px; padding:0; border-width:1.5px;}
+.loopbtn .glyph{display:block;}
+.loopbtn.rec .glyph{width:6px; height:6px; border-radius:50%; background:#7a2a26;}
+.loopbtn.rec:hover .glyph{background:#c8382f;}
+.loopbtn.rec.engaged{border-color:#FF4136; animation:recpulse 1s ease-in-out infinite;}
+.loopbtn.rec.engaged .glyph{background:#FF4136; box-shadow:0 0 5px 1px rgba(255,65,54,.7);}
+.loopbtn.play .glyph{width:0; height:0; margin-left:2px; border-style:solid; border-width:3.5px 0 3.5px 6px; border-color:transparent transparent transparent var(--ink-soft);}
+.loopbtn.play:hover .glyph{border-left-color:var(--ink);}
+.loopbtn.play.engaged .glyph{border-left-color:var(--acc);}
+.loopbtn.play.empty{opacity:.4;}
+@keyframes recpulse{50%{box-shadow:0 0 6px 1px rgba(255,65,54,.6);}}
+.loopbar{position:absolute; left:0; right:0; bottom:-4px; height:2px; background:transparent; pointer-events:none;}
+.loopbar i{display:block; height:100%; width:0;}
+.loopbar.recording i{background:#FF4136;}
+.loopbar.playing i{background:var(--acc);}
+@keyframes loopfill{from{width:0;} to{width:100%;}}
+
 /* Select field */
 .selectfield{flex-basis:100%;}
 .mselect{
@@ -202,6 +221,10 @@ body{
 .module.compact .switchwrap{width:26px; gap:2px;}
 .module.compact .fswitch{width:16px; height:16px; border-width:1.5px;}
 .module.compact .fswitch .led{width:5px; height:5px;}
+.module.compact .loopbtn{width:13px; height:13px; border-width:1.5px;}
+.module.compact .loopbtn.rec .glyph{width:4px; height:4px;}
+.module.compact .loopbtn.play .glyph{margin-left:1px; border-width:2.5px 0 2.5px 4px;}
+.module.compact .mhead-left{gap:3px;}
 .module.compact .mselect{font-size:8.5px; padding:3px 4px;}
 .module.compact .mvideo-actions{margin-top:3px;}
 /* Output's scope is forced on even when its own card is compacted (see

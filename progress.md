@@ -8,6 +8,8 @@
 
 ## Recent work
 
+- 2026-09-21 — Per-node live taping: two buttons beside each node's bypass switch (● record, ▶ loop). First click records every change to that node's settings (any source: knob, switch, select, Chance, preset), second click stops, auto-stop at 4 s; ▶ loops the take (restores starting values, replays timestamped moves) until clicked again. New `js/recorder.js`; takes live in `state.loops`, survive undo, and are saved/restored with Export/Import. Verified in headless Firefox (record → loop playback → knob display follows → undo/delete/restore). Nodes with no params (Null) get no buttons. Not committed yet.
+
 - 2026-09-16 — Added CLAUDE.md and progress.md for ongoing tracking.
 - 2026-09-16 (bb896d5) — up.
 - 2026-09-16 (9db13c9) — Lay out the starter rack as one lane per signal chain, not by type.

@@ -10,6 +10,14 @@ export const state = {
   edges: new Map(), // id -> {id, from:{nodeId,port}, to:{nodeId,port}}
 };
 
+// Recorded parameter loops (see recorder.js), keyed by node id. Deliberately
+// NOT part of the undo/redo snapshots: a loop is performance material, not
+// patch structure, so Ctrl+Z after recording must not wipe the take. Loops
+// for deleted nodes stay in the map (so undoing the delete brings the loop
+// back) and are simply left out of serialize().
+// Shape: {duration (ms), initial:{param:value}, events:[{t (ms), name, value}]}
+export const loops = new Map();
+
 const listeners = new Set();
 export function onChange(fn) {
   listeners.add(fn);
@@ -32,7 +40,7 @@ let history = [];
 let future = [];
 
 function snapshot() {
-  return JSON.stringify(serialize());
+  return JSON.stringify(serializeGraph());
 }
 
 function restoreSnapshot(json) {
@@ -150,7 +158,12 @@ export function clearAll() {
   emit('clear');
 }
 
-export function serialize() {
+export function setLoop(id, loop) {
+  if (loop) loops.set(id, loop); else loops.delete(id);
+  emit('loop-change', id);
+}
+
+function serializeGraph() {
   return {
     version: 1,
     nodes: [...state.nodes.values()],
@@ -158,9 +171,21 @@ export function serialize() {
   };
 }
 
+export function serialize() {
+  const data = serializeGraph();
+  const saved = {};
+  for (const [id, loop] of loops) if (state.nodes.has(id)) saved[id] = loop;
+  if (Object.keys(saved).length) data.loops = saved;
+  return data;
+}
+
 export function deserialize(data) {
   clearAll();
+  loops.clear(); // an imported patch replaces the board, so it replaces the takes too
   for (const n of data.nodes || []) state.nodes.set(n.id, n);
   for (const e of data.edges || []) state.edges.set(e.id, e);
+  for (const [id, loop] of Object.entries(data.loops || {})) {
+    if (state.nodes.has(id) && loop && Array.isArray(loop.events) && loop.duration > 0) loops.set(id, loop);
+  }
   emit('load');
 }
