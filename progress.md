@@ -31,6 +31,8 @@
 - 2026-09-21 — Overdub recording + Clear takes. Record on a node with a saved take now plays that take and layers on it: new settings become parallel tracks, touching a recorded setting replaces only its track. New toolbar button **Clear takes** erases every node's loops (confirm; not undoable, loops are outside undo). Verified in headless Firefox by driving `recorder.js` (add track, replace track, clear).
 - 2026-09-21 (later) — Overdub v2: new tracks are no longer wrapped onto the old take's length — they form a `layer` with its own duration (a 1.9 s gesture over a 0.66 s loop stays 1.9 s), committed to the take at every old-loop wrap and on stop. Per-node × clear button beside Play; toolbar **Clear takes** now applies instantly (confirm dialog removed; a toast reports the count). Fixed along the way: the final commit ran after the recording was deregistered and dropped the last moves. Verified in headless Firefox.
 
+- 2026-09-21 (later) — Default rack replaced with the user's own patch (screenshot): added a second Field (`field2`), rewired Field→Crush/Comb.freq_mod/Null, Drive→Field II. Its settings became a new first preset, 'Starter Network — 339∶363 Hz' (values read off the screenshot: e.g. Ring 1882 Hz/0.05, Field 8 steps, Crush 6 bit/189, Comb 1178 Hz bypassed), so the seed no longer holds any values; the nine older presets now also bypass Field II. Caveat: the Field→Comb.freq_mod cable is now part of every preset's patch.
+
 ## Next steps (from README "Ideas for later")
 
 - Export a patch to a standalone HTML file that plays with no editor.

@@ -9,10 +9,30 @@
 
 export const PRESETS = [
   {
+    id: 'starter-network',
+    name: 'Starter Network — 339∶363 Hz',
+    note: "The default rack's own tuning: Tone (339 Hz) runs through Ring and Field, whose output also steps Crush and modulates Comb's delay; Tone II (363 Hz) feeds Freeze, Shimmer, and a second Field via Drive. Comb and Rhythm are bypassed.",
+    bypass: { tone2: false, rhythm: true, crush: false, ring: false, field: false, field2: false, freeze: false, comb: true, space: false, drive: false, shimmer: false },
+    params: {
+      tone: { freq: 339, level: 0.84 },
+      tone2: { freq: 363, level: 0.92 },
+      ring: { freq: 1882, mix: 0.05 },
+      field: { rate: 0.3, steps: 8, depth: 1 },
+      crush: { bits: 6, gate: 189, mix: 0.23 },
+      comb: { freq: 1178, resonance: 0.61, mix: 0.5 },
+      space: { size: 1.2, mix: 0.2 },
+      freeze: { time: 0.6, feedback: 0.9, mix: 0.4 },
+      drive: { drive: 20, mix: 1 },
+      shimmer: { rate: 0.86, depth: 0.5, mix: 0.45 },
+      field2: { rate: 0.81, steps: 6, depth: 1 },
+      output: { volume: 0.75 },
+    },
+  },
+  {
     id: 'unison-beat',
     name: 'Unison Beat — 4 Hz',
     note: 'Tone and Tone II are 4 Hz apart — a slow beat in the theta range, the same interference pattern behind monaural and binaural beating.',
-    bypass: { tone2: false, rhythm: true, crush: true, ring: true, field: false, freeze: true, comb: true, space: false, drive: true, shimmer: true },
+    bypass: { tone2: false, rhythm: true, crush: true, ring: true, field: false, freeze: true, comb: true, space: false, drive: true, shimmer: true, field2: true },
     params: {
       tone: { freq: 220, level: 0.7 },
       tone2: { freq: 224, level: 0.65 },
@@ -25,7 +45,7 @@ export const PRESETS = [
     id: 'perfect-fifth',
     name: 'Perfect Fifth — 3∶2',
     note: 'Tone II is locked a just fifth above Tone (ratio 3∶2, root 196 Hz) — the first interval past the octave where two tones lock into a simple, stable ratio instead of drifting.',
-    bypass: { tone2: false, rhythm: true, crush: true, ring: true, field: false, freeze: true, comb: true, space: false, drive: true, shimmer: true },
+    bypass: { tone2: false, rhythm: true, crush: true, ring: true, field: false, freeze: true, comb: true, space: false, drive: true, shimmer: true, field2: true },
     params: {
       tone: { freq: 196, level: 0.7 },
       tone2: { freq: 294, level: 0.65 },
@@ -38,7 +58,7 @@ export const PRESETS = [
     id: 'golden-ratio',
     name: 'Golden Ratio — φ',
     note: 'Tone II sits φ ≈ 1.618… times above Tone — the one ratio guaranteed not to lock into any simple integer relationship, so the beating between the two tones never resolves into a steady pulse.',
-    bypass: { tone2: false, rhythm: true, crush: false, ring: false, field: false, freeze: false, comb: true, space: false, drive: true, shimmer: true },
+    bypass: { tone2: false, rhythm: true, crush: false, ring: false, field: false, freeze: false, comb: true, space: false, drive: true, shimmer: true, field2: true },
     params: {
       tone: { freq: 220, level: 0.7 },
       tone2: { freq: 356, level: 0.65 },
@@ -54,7 +74,7 @@ export const PRESETS = [
     id: 'harmonic-series',
     name: 'Harmonic Series — 1∶2∶3∶4',
     note: 'Tone at 110 Hz is the fundamental; Tone II sits exactly an octave up (2nd harmonic), Ring is tuned to the 3rd, Comb to the 4th — the additive stack behind the timbre of any pitched instrument, laid out one node per partial.',
-    bypass: { tone2: false, rhythm: true, crush: true, ring: false, field: false, freeze: false, comb: false, space: false, drive: true, shimmer: true },
+    bypass: { tone2: false, rhythm: true, crush: true, ring: false, field: false, freeze: false, comb: false, space: false, drive: true, shimmer: true, field2: true },
     params: {
       tone: { freq: 110, level: 0.72 },
       tone2: { freq: 220, level: 0.6 },
@@ -70,7 +90,7 @@ export const PRESETS = [
     id: 'tritone',
     name: 'Tritone — √2',
     note: 'Tone II sits exactly half an octave above Tone (2^(6/12), the equal-tempered tritone) — an interval with no simple ratio to fall back on, ambiguous the same way the tritone paradox is ambiguous.',
-    bypass: { tone2: false, rhythm: true, crush: true, ring: true, field: false, freeze: true, comb: true, space: false, drive: true, shimmer: true },
+    bypass: { tone2: false, rhythm: true, crush: true, ring: true, field: false, freeze: true, comb: true, space: false, drive: true, shimmer: true, field2: true },
     params: {
       tone: { freq: 220, level: 0.7 },
       tone2: { freq: 311, level: 0.65 },
@@ -83,7 +103,7 @@ export const PRESETS = [
     id: 'pythagorean-comma',
     name: 'Pythagorean Comma',
     note: 'Twelve stacked just fifths should land back on the starting pitch seven octaves up — they miss by (3∶2)¹²⁄2⁷, about 23.5 cents. Comb is tuned to that same gap above Tone, so the mismatch shows up as a slow shimmer instead of a rounding error.',
-    bypass: { tone2: true, rhythm: true, crush: true, ring: true, field: false, freeze: false, comb: false, space: false, drive: true, shimmer: true },
+    bypass: { tone2: true, rhythm: true, crush: true, ring: true, field: false, freeze: false, comb: false, space: false, drive: true, shimmer: true, field2: true },
     params: {
       tone: { freq: 220, level: 0.72 },
       tone2: { freq: 220, level: 0.65 },
@@ -98,7 +118,7 @@ export const PRESETS = [
     id: 'critical-band',
     name: 'Critical Band Roughness',
     note: 'Tone and Tone II sit an equal-tempered semitone apart at 440 Hz — close enough that the beating stops sounding like rhythm and starts sounding like buzz, Helmholtz\'s account of dissonance made audible.',
-    bypass: { tone2: false, rhythm: true, crush: true, ring: true, field: true, freeze: true, comb: true, space: false, drive: true, shimmer: true },
+    bypass: { tone2: false, rhythm: true, crush: true, ring: true, field: true, freeze: true, comb: true, space: false, drive: true, shimmer: true, field2: true },
     params: {
       tone: { freq: 440, level: 0.7 },
       tone2: { freq: 466, level: 0.65 },
@@ -110,7 +130,7 @@ export const PRESETS = [
     id: 'fibonacci-pulse',
     name: 'Fibonacci Pulse',
     note: 'Rhythm\'s rate/decay and Crush\'s bit depth are all set from Fibonacci numbers, and Comb is tuned to 377 Hz — a Fibonacci number doubling as a resonant frequency.',
-    bypass: { tone2: true, rhythm: false, crush: false, ring: true, field: false, freeze: false, comb: false, space: false, drive: true, shimmer: true },
+    bypass: { tone2: true, rhythm: false, crush: false, ring: true, field: false, freeze: false, comb: false, space: false, drive: true, shimmer: true, field2: true },
     params: {
       tone: { freq: 233, level: 0.75 },
       tone2: { freq: 233, level: 0.65 },
@@ -127,7 +147,7 @@ export const PRESETS = [
     id: 'driven-shimmer',
     name: 'Driven Shimmer',
     note: 'Tone II\'s main output — unused in every other preset — finally gets put to work: through Drive\'s saturation into Shimmer\'s modulated delay, turning a plain fifth above Tone into a driven, chorused wash.',
-    bypass: { tone2: false, rhythm: true, crush: true, ring: true, field: false, freeze: true, comb: true, space: false, drive: false, shimmer: false },
+    bypass: { tone2: false, rhythm: true, crush: true, ring: true, field: false, freeze: true, comb: true, space: false, drive: false, shimmer: false, field2: true },
     params: {
       tone: { freq: 196, level: 0.7 },
       tone2: { freq: 294, level: 0.65 },

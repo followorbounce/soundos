@@ -39,66 +39,55 @@ function toast(msg, isError = false) {
   setTimeout(() => el.remove(), 4200);
 }
 
-// Starter rack mirroring Pulse Train — Stage II's own default board: same
-// 13 units (Tone/Tone II as two Oscillators, Rhythm, LFO, Crush, Ring, Field,
-// Freeze, Comb, Drive as Distortion, Shimmer, Space as Reverb, Output), plus
-// a Null junction (a passive unity-gain pass-through, see nodeLibrary.js)
-// landing all five chains before Output rather than summing directly on
-// Output's own 'in' — a real pre-master junction point, in the same spot the
-// reference has nothing.
+// Starter rack: the user's own network (from a 2026-09-21 screenshot), built
+// on Pulse Train — Stage II's 13 units plus a second Field and a Null junction
+// (a passive unity-gain pass-through, see nodeLibrary.js) that lands every
+// chain before Output. Only the wiring and layout live here; every knob value
+// and on/off position comes from the first preset (presets.js), applied at the
+// end, so changing the sound of the default rack means editing a preset.
 //
-// Laid out as one lane per signal chain, not grouped by type: each node's x
-// is how many processing steps it sits from its own source, so a two-step
-// chain (Tone->Ring->Field) ends and turns toward Null/Output two columns
-// earlier than a three-step one (Tone->Crush->Comb->Space) — the cable for
-// the shorter chain just runs on a longer diagonal to get there, rather than
-// every node being padded out to a shared column. Rhythm has no processing
-// at all, so its cable is the longest diagonal of all, top-left corner
-// straight across to the junction. Y is grouped by lane: Rhythm alone on
-// top, then Tone's two chains (Ring/Field above, Crush/Comb/Space below,
-// Tone itself sitting at their midpoint so it fans out to both), then
-// Tone II's two chains the same way underneath. The one simplification
-// versus the reference: our Oscillator has a single output, not two (a
-// plain `out` and a ratio-locked `out2`) — here Tone's own `out` just feeds
-// both of its destinations instead.
+//   Tone  -> Ring -> Field -> Crush -> Comb -> Space -> Null
+//                      \-> Comb.freq (modulation)   \-> Null
+//   Tone II -> Freeze -> Null
+//   Tone II -> Drive -> Shimmer -> Null
+//                    \-> Field II -> Null
+//   Null -> Output;  Rhythm and LFO are left unpatched (an LFO is a CV source
+//   waiting to be dragged onto any `_mod` jack; Rhythm is bypassed until wanted).
 function seedDemoPatch() {
-  const tone = addNode('oscillator', 60, 360, NODE_TYPES.oscillator.params);
-  const tone2 = addNode('oscillator', 60, 760, NODE_TYPES.oscillator.params);
-  const rhythm = addNode('rhythm', 60, 60, NODE_TYPES.rhythm.params);
-  const lfo = addNode('lfo', 1260, 900, NODE_TYPES.lfo.params);
+  const tone = addNode('oscillator', 80, 60, NODE_TYPES.oscillator.params);
+  const tone2 = addNode('oscillator', 60, 570, NODE_TYPES.oscillator.params);
+  const rhythm = addNode('rhythm', 1070, 690, NODE_TYPES.rhythm.params);
+  const lfo = addNode('lfo', 1310, 730, NODE_TYPES.lfo.params);
+  const ring = addNode('ring', 310, 70, NODE_TYPES.ring.params);
+  const crush = addNode('crush', 520, 350, NODE_TYPES.crush.params);
+  const freeze = addNode('freeze', 310, 440, NODE_TYPES.freeze.params);
+  const drive = addNode('distortion', 290, 780, NODE_TYPES.distortion.params);
+  const field = addNode('field', 520, 80, NODE_TYPES.field.params);
+  const field2 = addNode('field', 520, 880, NODE_TYPES.field.params);
+  const comb = addNode('comb', 770, 190, NODE_TYPES.comb.params);
+  const shimmer = addNode('shimmer', 520, 600, NODE_TYPES.shimmer.params);
+  const space = addNode('reverb', 960, 200, NODE_TYPES.reverb.params);
+  const junction = addNode('nullNode', 1130, 510, NODE_TYPES.nullNode.params);
+  const output = addNode('output', 1310, 470, NODE_TYPES.output.params);
 
-  const ring = addNode('ring', 360, 260, NODE_TYPES.ring.params);
-  const crush = addNode('crush', 360, 460, NODE_TYPES.crush.params);
-  const freeze = addNode('freeze', 360, 660, NODE_TYPES.freeze.params);
-  const drive = addNode('distortion', 360, 860, NODE_TYPES.distortion.params);
+  roles = { tone, tone2, rhythm, lfo, crush, ring, drive, field, field2, freeze, comb, shimmer, space, junction, output };
 
-  const field = addNode('field', 660, 260, NODE_TYPES.field.params);
-  const comb = addNode('comb', 660, 460, NODE_TYPES.comb.params);
-  const shimmer = addNode('shimmer', 660, 860, NODE_TYPES.shimmer.params);
-
-  const space = addNode('reverb', 960, 460, NODE_TYPES.reverb.params);
-
-  const junction = addNode('nullNode', 1260, 460, NODE_TYPES.nullNode.params);
-  const output = addNode('output', 1560, 460, NODE_TYPES.output.params);
-
-  roles = { tone, tone2, rhythm, lfo, crush, ring, drive, field, freeze, comb, shimmer, space, junction, output };
-
-  addEdge(tone, 'out', crush, 'in');
+  addEdge(tone, 'out', ring, 'in');
+  addEdge(ring, 'out', field, 'in');
+  addEdge(field, 'out', crush, 'in');
+  addEdge(field, 'out', comb, 'freq_mod');
+  addEdge(field, 'out', junction, 'in');
   addEdge(crush, 'out', comb, 'in');
   addEdge(comb, 'out', space, 'in');
   addEdge(space, 'out', junction, 'in');
-  addEdge(tone, 'out', ring, 'in');
-  addEdge(ring, 'out', field, 'in');
-  addEdge(field, 'out', junction, 'in');
-  addEdge(rhythm, 'out', junction, 'in');
   addEdge(tone2, 'out', freeze, 'in');
   addEdge(freeze, 'out', junction, 'in');
   addEdge(tone2, 'out', drive, 'in');
   addEdge(drive, 'out', shimmer, 'in');
   addEdge(shimmer, 'out', junction, 'in');
+  addEdge(drive, 'out', field2, 'in');
+  addEdge(field2, 'out', junction, 'in');
   addEdge(junction, 'out', output, 'in');
-  // LFO is left unpatched, same as the reference — a CV source sitting ready
-  // to be dragged onto any `_mod` jack during a set, not part of the fixed chain.
 
   applyPreset(roles, PRESETS[0].params, PRESETS[0].bypass);
 }
