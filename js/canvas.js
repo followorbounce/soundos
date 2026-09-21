@@ -1,7 +1,7 @@
 import { NODE_TYPES } from './nodeLibrary.js';
 import { state, onChange, moveNode, removeNode, setParam, addEdge, removeEdge, toggleBypass, setBypassState, checkpoint, undo, redo } from './state.js';
 import { engine } from './audio/engine.js';
-import { toggleRecord, togglePlay, getStatus, setApplyHook, setStatusHook, MAX_RECORD_MS } from './recorder.js';
+import { toggleRecord, togglePlay, getStatus, setApplyHook, setStatusHook, setTrim, BYPASS_KEY, MAX_RECORD_MS } from './recorder.js';
 
 const viewport = document.getElementById('canvas-viewport');
 const inner = document.getElementById('canvas-inner');
@@ -445,7 +445,17 @@ function renderNode(node) {
     headLeft.append(recBtn, playBtn);
     const bar = document.createElement('div');
     bar.className = 'loopbar';
-    bar.appendChild(document.createElement('i'));
+    const win = document.createElement('div'); // the active (trimmed) window; the progress fill lives inside it
+    win.className = 'loopwin';
+    win.appendChild(document.createElement('i'));
+    bar.appendChild(win);
+    for (const side of ['start', 'end']) {
+      const h = document.createElement('div');
+      h.className = 'loophandle ' + side;
+      h.title = `Drag to trim the loop ${side} (double-click to reset)`;
+      attachTrimHandle(h, bar, node.id, side);
+      bar.appendChild(h);
+    }
     head.appendChild(bar);
   }
   head.appendChild(headLeft);
@@ -539,14 +549,24 @@ function paintLoopUi(nodeId) {
   recBtn.classList.toggle('engaged', st.recording);
   recBtn.title = st.recording
     ? 'Stop recording'
-    : `Record every change to this node's settings (up to ${MAX_RECORD_MS / 1000} s)` + (st.hasLoop ? ' — replaces the saved loop' : '');
+    : `Record every change to this node's settings, including on/off (up to ${MAX_RECORD_MS / 1000} s; click again to stop)` + (st.hasLoop ? ' — replaces the saved loop' : '');
   playBtn.classList.toggle('engaged', st.playing);
   playBtn.classList.toggle('empty', !st.hasLoop && !st.recording);
   playBtn.title = st.playing ? 'Stop the loop' : st.hasLoop ? 'Play the recorded settings in a loop' : 'Nothing recorded yet — press record first';
-  const fill = bar.firstChild;
+  const win = bar.querySelector('.loopwin');
+  const fill = win.firstChild;
   fill.style.animation = 'none';
   bar.classList.toggle('recording', st.recording);
   bar.classList.toggle('playing', st.playing);
+  bar.classList.toggle('trimmable', st.hasLoop && !st.recording);
+  // Window position on the take's timeline (the whole bar while recording).
+  const total = st.hasLoop && !st.recording ? st.loopDuration : 1;
+  const a = st.hasLoop && !st.recording ? st.trimStart / total : 0;
+  const z = st.hasLoop && !st.recording ? st.trimEnd / total : 1;
+  win.style.left = a * 100 + '%';
+  win.style.width = (z - a) * 100 + '%';
+  bar.style.setProperty('--ts', a * 100 + '%');
+  bar.style.setProperty('--te', z * 100 + '%');
   if (st.recording || st.playing) {
     void fill.offsetWidth; // restart the CSS animation
     // Negative delay: after a re-render mid-loop, resume at the true phase instead of from zero.
@@ -555,10 +575,47 @@ function paintLoopUi(nodeId) {
   }
 }
 
+// Drag one end of the loop bar to trim the looping window. Pointer capture keeps
+// the drag alive off the handle; the bar's on-screen width (already zoom-scaled)
+// maps linearly onto the take's timeline.
+function attachTrimHandle(handle, bar, nodeId, side) {
+  const stop = (e) => e.stopPropagation(); // don't start a node drag / wire
+  handle.addEventListener('mousedown', stop);
+  handle.addEventListener('dblclick', (e) => {
+    stop(e);
+    const st = getStatus(nodeId);
+    if (!st.hasLoop) return;
+    setTrim(nodeId, side === 'start' ? 0 : st.trimStart, side === 'end' ? st.loopDuration : st.trimEnd);
+  });
+  handle.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    handle.setPointerCapture(e.pointerId);
+    handle.classList.add('dragging');
+  });
+  handle.addEventListener('pointermove', (e) => {
+    if (!handle.hasPointerCapture(e.pointerId)) return;
+    const st = getStatus(nodeId);
+    if (!st.hasLoop) return;
+    const r = bar.getBoundingClientRect();
+    const t = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) * st.loopDuration;
+    if (side === 'start') setTrim(nodeId, t, st.trimEnd);
+    else setTrim(nodeId, st.trimStart, t);
+  });
+  const done = (e) => { handle.classList.remove('dragging'); if (handle.hasPointerCapture(e.pointerId)) handle.releasePointerCapture(e.pointerId); };
+  handle.addEventListener('pointerup', done);
+  handle.addEventListener('pointercancel', done);
+}
+
 setStatusHook(paintLoopUi);
 // Loop playback pushes values through the same path a knob drag uses (state +
 // live audio + Video Output resolution), then repaints the control itself.
 setApplyHook((nodeId, name, value) => {
+  if (name === BYPASS_KEY) { // the node's on/off switch is part of a take too
+    setBypassState(nodeId, !!value);
+    if (engine.isLive()) engine.setBypass(nodeId, !!value);
+    return;
+  }
   onParamInput(nodeId, name, value);
   controlSync.get(nodeId)?.get(name)?.(value);
 });
@@ -802,6 +859,16 @@ function fullRender() {
 
 onChange((kind, payload) => {
   if (kind === 'param-change' || kind === 'loop-change') return; // params/loops repaint locally, no full redraw needed
+  if (kind === 'bypass-change') {
+    // Loop playback can flip a node's power at any moment — repaint just that node
+    // (a full redraw would tear down a knob the user may be dragging elsewhere).
+    const el = nodeEls.get(payload.id);
+    if (el) {
+      el.classList.toggle('bypassed', payload.bypassed);
+      el.querySelector('.fswitch:not(.loopbtn)')?.classList.toggle('engaged', !payload.bypassed);
+    }
+    return;
+  }
   if (kind === 'node-move') {
     // Fast path: dragging fires on every mousemove, avoid rebuilding all DOM.
     const el = nodeEls.get(payload);

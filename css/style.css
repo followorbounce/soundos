@@ -179,9 +179,20 @@ body{
 .loopbtn.play.empty{opacity:.4;}
 @keyframes recpulse{50%{box-shadow:0 0 6px 1px rgba(255,65,54,.6);}}
 .loopbar{position:absolute; left:0; right:0; bottom:-4px; height:2px; background:transparent; pointer-events:none;}
-.loopbar i{display:block; height:100%; width:0;}
+.loopbar.trimmable{background:var(--line-strong);}
+.loopwin{position:absolute; top:0; bottom:0; left:0; width:100%;}
+.loopbar.trimmable .loopwin{background:var(--ink-soft); opacity:.55;}
+.loopwin i{display:block; height:100%; width:0;}
 .loopbar.recording i{background:#FF4136;}
 .loopbar.playing i{background:var(--acc);}
+.loopbar.playing .loopwin{opacity:1;}
+/* Trim handles: centred on the window's ends; a wider invisible hit area (::before) keeps them easy to grab. */
+.loophandle{display:none; position:absolute; top:-5px; width:5px; height:12px; margin-left:-2.5px; border-radius:2px; background:var(--acc); cursor:ew-resize; pointer-events:auto; touch-action:none;}
+.loophandle::before{content:''; position:absolute; inset:-3px -6px;}
+.loopbar.trimmable .loophandle{display:block;}
+.loophandle.start{left:var(--ts);}
+.loophandle.end{left:var(--te);}
+.loophandle:hover,.loophandle.dragging{box-shadow:0 0 4px 1px var(--led-glow);}
 @keyframes loopfill{from{width:0;} to{width:100%;}}
 
 /* Select field */

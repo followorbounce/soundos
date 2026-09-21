@@ -1,7 +1,8 @@
 import { state, loops, setLoop, onChange } from './state.js';
 
 // Per-node "live taping": record every change made to one node's settings for
-// up to MAX_RECORD_MS, then replay that gesture in a loop.
+// up to MAX_RECORD_MS (a second click on Record stops it early), then replay
+// that gesture in a loop.
 //
 //  - Recording is driven off state.js's 'param-change' event, so it captures
 //    every way a setting can move — knob drag, switch, select, Chance, preset
@@ -14,13 +15,20 @@ import { state, loops, setLoop, onChange } from './state.js';
 //    apply hook) so knobs, the audio engine and Video Output's resolution all
 //    react exactly as if a hand had turned them. `applying` keeps those
 //    replayed changes from being re-recorded.
+//  - The node's on/off (bypass) state is recorded and replayed like any other
+//    setting, under the pseudo-param name BYPASS_KEY (value: true = bypassed).
+//  - A take can be trimmed: `start` / `end` (ms on the take's own timeline)
+//    bound the part that loops. Each pass first restores the state the take
+//    had at `start` (initial values + every event before it), so a trimmed
+//    loop is as deterministic as a whole one.
 
-export const MAX_RECORD_MS = 4000;
+export const MAX_RECORD_MS = 61000;
+export const BYPASS_KEY = '__bypass';
 const MIN_LOOP_MS = 50;
 const TICK_MS = 8;
 
 const recording = new Map(); // nodeId -> {startedAt, initial, events, timer}
-const playing = new Map(); // nodeId -> {startedAt, cycle, idx}
+const playing = new Map(); // nodeId -> {startedAt, cycle, idx, start, end}
 let applying = false;
 let applyHook = null; // (nodeId, name, value) => void — provided by canvas.js
 let statusHook = () => {}; // (nodeId) => void — canvas.js re-renders that node's buttons
@@ -29,18 +37,47 @@ let ticker = null;
 export function setApplyHook(fn) { applyHook = fn; }
 export function setStatusHook(fn) { statusHook = fn; }
 
+// The loop's active window, always valid: 0 <= start < end <= duration, at
+// least MIN_LOOP_MS wide (imported/old takes may carry no trim at all).
+export function loopBounds(loop) {
+  const dur = loop.duration;
+  const min = Math.min(MIN_LOOP_MS, dur);
+  const start = Math.min(Math.max(0, Number.isFinite(loop.start) ? loop.start : 0), dur - min);
+  const end = Math.min(dur, Math.max(start + min, Number.isFinite(loop.end) ? loop.end : dur));
+  return { start, end };
+}
+
 export function getStatus(nodeId) {
   const loop = loops.get(nodeId);
   const rec = recording.get(nodeId);
   const play = playing.get(nodeId);
+  const b = loop ? loopBounds(loop) : { start: 0, end: 0 };
   return {
     recording: !!rec,
     playing: !!play,
     hasLoop: !!loop,
     startedAt: rec ? rec.startedAt : play ? play.startedAt : 0,
-    // Length of the bar animation: the fixed cap while recording, the take's own length while looping.
-    duration: rec ? MAX_RECORD_MS : loop ? loop.duration : 0,
+    // Length of the bar animation: the fixed cap while recording, the trimmed window while looping.
+    duration: rec ? MAX_RECORD_MS : loop ? b.end - b.start : 0,
+    loopDuration: loop ? loop.duration : 0, // full take length (the trim handles' scale)
+    trimStart: b.start,
+    trimEnd: b.end,
   };
+}
+
+// Trim the looping window to [start, end] ms of the take. While playing, the
+// pass restarts from the new start so the change is heard straight away.
+export function setTrim(nodeId, start, end) {
+  const loop = loops.get(nodeId);
+  if (!loop) return;
+  const b = loopBounds({ duration: loop.duration, start, end });
+  const cur = loopBounds(loop);
+  if (b.start === cur.start && b.end === cur.end) return;
+  loop.start = b.start;
+  loop.end = b.end;
+  setLoop(nodeId, loop);
+  if (playing.has(nodeId)) restartPlaying(nodeId, loop);
+  statusHook(nodeId);
 }
 
 export function toggleRecord(nodeId) {
@@ -62,7 +99,7 @@ function startRecording(nodeId) {
   stopPlaying(nodeId); // replayed moves must not fight, or be mistaken for, the new take
   const rec = {
     startedAt: performance.now(),
-    initial: { ...node.params },
+    initial: { ...node.params, [BYPASS_KEY]: !!node.bypassed },
     events: [],
     timer: setTimeout(() => finishRecording(nodeId), MAX_RECORD_MS),
   };
@@ -94,10 +131,30 @@ function finishRecording(nodeId) {
 function startPlaying(nodeId) {
   const loop = loops.get(nodeId);
   if (!loop || !state.nodes.has(nodeId)) return;
-  playing.set(nodeId, { startedAt: performance.now(), cycle: 0, idx: 0 });
-  applyInitial(nodeId, loop);
+  restartPlaying(nodeId, loop);
   ensureTicker();
   statusHook(nodeId);
+}
+
+// (Re)start a pass from the window's start: restore the take's state at that
+// point and queue the events after it.
+function restartPlaying(nodeId, loop) {
+  const { start, end } = loopBounds(loop);
+  const p = { startedAt: performance.now(), cycle: 0, idx: 0, start, end };
+  playing.set(nodeId, p);
+  beginPass(nodeId, loop, p);
+}
+
+function beginPass(nodeId, loop, p) {
+  // State at the window's start = initial values + every event at or before it.
+  const values = { ...loop.initial };
+  let i = 0;
+  while (i < loop.events.length && loop.events[i].t <= p.start) {
+    values[loop.events[i].name] = loop.events[i].value;
+    i++;
+  }
+  p.idx = i;
+  for (const [name, value] of Object.entries(values)) applyValue(nodeId, name, value);
 }
 
 function stopPlaying(nodeId) {
@@ -112,10 +169,6 @@ function applyValue(nodeId, name, value) {
   try { applyHook(nodeId, name, value); } finally { applying = false; }
 }
 
-function applyInitial(nodeId, loop) {
-  for (const [name, value] of Object.entries(loop.initial)) applyValue(nodeId, name, value);
-}
-
 function ensureTicker() {
   if (!ticker) ticker = setInterval(tick, TICK_MS);
 }
@@ -125,16 +178,18 @@ function tick() {
   for (const [nodeId, p] of playing) {
     const loop = loops.get(nodeId);
     if (!loop || !state.nodes.has(nodeId)) { stopPlaying(nodeId); continue; }
+    const b = loopBounds(loop);
+    if (b.start !== p.start || b.end !== p.end) { restartPlaying(nodeId, loop); continue; } // trimmed under us
     const elapsed = now - p.startedAt;
-    const cycle = Math.floor(elapsed / loop.duration);
-    const pos = elapsed - cycle * loop.duration;
+    const period = p.end - p.start;
+    const cycle = Math.floor(elapsed / period);
+    const pos = p.start + (elapsed - cycle * period); // position on the take's timeline
     if (cycle !== p.cycle) {
-      // Wrapped: restore the starting values and rewind. Any events left in the
-      // tail of the old pass (at most one tick's worth) are skipped on purpose —
-      // the restore would overwrite them immediately anyway.
+      // Wrapped: restore the state at the window's start and rewind. Any events
+      // left in the tail of the old pass (at most one tick's worth) are skipped
+      // on purpose — the restore would overwrite them immediately anyway.
       p.cycle = cycle;
-      p.idx = 0;
-      applyInitial(nodeId, loop);
+      beginPass(nodeId, loop, p);
     }
     while (p.idx < loop.events.length && loop.events[p.idx].t <= pos) {
       const ev = loop.events[p.idx++];
@@ -144,10 +199,13 @@ function tick() {
 }
 
 onChange((kind, payload) => {
-  if (kind === 'param-change') {
+  if (kind === 'param-change' || kind === 'bypass-change') {
     if (applying) return;
     const rec = recording.get(payload.id);
-    if (rec) rec.events.push({ t: Math.round(performance.now() - rec.startedAt), name: payload.name, value: payload.value });
+    if (!rec) return;
+    const t = Math.round(performance.now() - rec.startedAt);
+    if (kind === 'bypass-change') rec.events.push({ t, name: BYPASS_KEY, value: !!payload.bypassed });
+    else rec.events.push({ t, name: payload.name, value: payload.value });
     return;
   }
   if (kind === 'node-remove' || kind === 'clear' || kind === 'load') {
