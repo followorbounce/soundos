@@ -119,6 +119,9 @@ function finishRecording(nodeId) {
     const touched = new Set(rec.events.map((e) => e.name));
     const initial = {};
     for (const name of touched) initial[name] = rec.initial[name];
+    // The node's on/off position at the start is always part of a take, even if
+    // the switch was never touched — every pass restores it.
+    initial[BYPASS_KEY] = rec.initial[BYPASS_KEY];
     const elapsed = Math.min(performance.now() - rec.startedAt, MAX_RECORD_MS);
     const duration = Math.max(MIN_LOOP_MS, elapsed, rec.events[rec.events.length - 1].t + 1);
     setLoop(nodeId, { duration, initial, events: rec.events });
@@ -155,6 +158,12 @@ function beginPass(nodeId, loop, p) {
   }
   p.idx = i;
   for (const [name, value] of Object.entries(values)) applyValue(nodeId, name, value);
+}
+
+// Stop every playing loop (a preset recall re-tunes the whole board, so loops
+// must not keep fighting it).
+export function stopAllPlaying() {
+  for (const id of [...playing.keys()]) stopPlaying(id);
 }
 
 function stopPlaying(nodeId) {

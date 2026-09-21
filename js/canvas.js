@@ -1,7 +1,7 @@
 import { NODE_TYPES } from './nodeLibrary.js';
 import { state, onChange, moveNode, removeNode, setParam, addEdge, removeEdge, toggleBypass, setBypassState, checkpoint, undo, redo } from './state.js';
 import { engine } from './audio/engine.js';
-import { toggleRecord, togglePlay, getStatus, setApplyHook, setStatusHook, setTrim, BYPASS_KEY, MAX_RECORD_MS } from './recorder.js';
+import { toggleRecord, togglePlay, getStatus, setApplyHook, setStatusHook, stopAllPlaying, setTrim, BYPASS_KEY, MAX_RECORD_MS } from './recorder.js';
 
 const viewport = document.getElementById('canvas-viewport');
 const inner = document.getElementById('canvas-inner');
@@ -135,6 +135,7 @@ export function randomizeAllParams() {
 // 'tone2' or 'space' to the actual node id in the current patch, so this
 // works against whatever the starter rack currently is, not fixed ids.
 export function applyPreset(roles, params, bypass) {
+  stopAllPlaying(); // recorded loops would otherwise fight the preset
   checkpoint();
   for (const [role, values] of Object.entries(params || {})) {
     const id = roles[role];

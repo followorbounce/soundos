@@ -8,6 +8,8 @@
 
 ## Recent work
 
+- 2026-09-21 — Taping fixes: a take always stores the node's on/off position at record start (so ▶ restores it even if the switch was never touched during the take); recalling a preset now stops every playing loop. Verified in headless Firefox.
+
 - 2026-09-21 — Live taping v2: record cap raised 4 s → 61 s (second click on ● still stops early); a take now also records the node's on/off (bypass) and ▶ replays it, switching the node on/off; the loop bar has two drag handles to trim the looping window from both ends (double-click a handle resets it; each pass restores the state at the trim start). Verified in headless Firefox (record with bypass events, playback flips `.bypassed`, trim drag/reset).
 
 - 2026-09-21 — Per-node live taping: two buttons beside each node's bypass switch (● record, ▶ loop). First click records every change to that node's settings (any source: knob, switch, select, Chance, preset), second click stops, auto-stop at 4 s; ▶ loops the take (restores starting values, replays timestamped moves) until clicked again. New `js/recorder.js`; takes live in `state.loops`, survive undo, and are saved/restored with Export/Import. Verified in headless Firefox (record → loop playback → knob display follows → undo/delete/restore). Nodes with no params (Null) get no buttons. Committed (eca1284) and pushed 2026-09-21.
