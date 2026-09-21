@@ -15,7 +15,7 @@ export const state = {
 // patch structure, so Ctrl+Z after recording must not wipe the take. Loops
 // for deleted nodes stay in the map (so undoing the delete brings the loop
 // back) and are simply left out of serialize().
-// Shape: {duration (ms), initial:{param:value}, events:[{t (ms), name, value}]}
+// Shape: {duration (ms), initial:{param:value}, events:[{t (ms), name, value}], start?, end?, layers?: [{duration, initial, events}] (overdubbed tracks, each looping on its own period)}
 export const loops = new Map();
 
 const listeners = new Set();

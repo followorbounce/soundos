@@ -177,6 +177,12 @@ body{
 .loopbtn.play:hover .glyph{border-left-color:var(--ink);}
 .loopbtn.play.engaged .glyph{border-left-color:var(--acc);}
 .loopbtn.play.empty{opacity:.4;}
+.loopbtn.clr .glyph{width:8px; height:8px; position:relative;}
+.loopbtn.clr .glyph::before,.loopbtn.clr .glyph::after{content:''; position:absolute; left:0; right:0; top:3.25px; height:1.5px; background:var(--ink-soft);}
+.loopbtn.clr .glyph::before{transform:rotate(45deg);}
+.loopbtn.clr .glyph::after{transform:rotate(-45deg);}
+.loopbtn.clr:hover .glyph::before,.loopbtn.clr:hover .glyph::after{background:#c8382f;}
+.loopbtn.clr.empty{opacity:.4;}
 @keyframes recpulse{50%{box-shadow:0 0 6px 1px rgba(255,65,54,.6);}}
 .loopbar{position:absolute; left:0; right:0; bottom:-4px; height:2px; background:transparent; pointer-events:none;}
 .loopbar.trimmable{background:var(--line-strong);}
@@ -235,6 +241,8 @@ body{
 .module.compact .loopbtn{width:13px; height:13px; border-width:1.5px;}
 .module.compact .loopbtn.rec .glyph{width:4px; height:4px;}
 .module.compact .loopbtn.play .glyph{margin-left:1px; border-width:2.5px 0 2.5px 4px;}
+.module.compact .loopbtn.clr .glyph{width:6px; height:6px;}
+.module.compact .loopbtn.clr .glyph::before,.module.compact .loopbtn.clr .glyph::after{top:2.25px;}
 .module.compact .mhead-left{gap:3px;}
 .module.compact .mselect{font-size:8.5px; padding:3px 4px;}
 .module.compact .mvideo-actions{margin-top:3px;}

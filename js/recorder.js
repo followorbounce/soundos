@@ -23,21 +23,23 @@ import { state, loops, setLoop, onChange } from './state.js';
 //    loop is as deterministic as a whole one.
 //  - Overdub: pressing Record on a node that already has a take does not start
 //    from scratch. The saved take plays while you record. A setting the take
-//    never touched gets a new parallel track merged into it; a setting the take
-//    already holds is taken over the moment you move it — its old track goes
-//    silent for the rest of the recording and is replaced by what you play. New
-//    moves are stamped on the take's own timeline (position within the looping
-//    window), so the old and new tracks stay in step; if you keep recording past
-//    one pass, a setting's track is whatever you played during the last pass in
-//    which you touched it.
+//    never touched gets a new track; a setting the take already holds is taken
+//    over the moment you move it — its old track goes silent for the rest of the
+//    recording and is replaced by what you play. New tracks are NOT bound to the
+//    old take's length: everything played during the recording becomes one
+//    independent `layer` ({duration, initial, events}, timed from the moment
+//    Record was pressed) that loops on its own period, next to the take's main
+//    events, so a 10 s gesture over a 2 s loop stays 10 s long. The layer is
+//    committed to the stored take every time the old take's loop wraps (and on
+//    stop), so what you have played is saved as you go.
 
 export const MAX_RECORD_MS = 61000;
 export const BYPASS_KEY = '__bypass';
 const MIN_LOOP_MS = 50;
 const TICK_MS = 8;
 
-const recording = new Map(); // nodeId -> {startedAt, initial, events, timer, base?, start, end, cur, tracks, muted}
-const playing = new Map(); // nodeId -> {startedAt, cycle, idx, start, end, muted?}
+const recording = new Map(); // nodeId -> {startedAt, initial, events, timer, base?, current?, tracks, muted}
+const playing = new Map(); // nodeId -> {startedAt, cycle, idx, start, end, muted?, layerStates}
 let applying = false;
 let applyHook = null; // (nodeId, name, value) => void — provided by canvas.js
 let statusHook = () => {}; // (nodeId) => void — canvas.js re-renders that node's buttons
@@ -108,15 +110,22 @@ export function togglePlay(nodeId) {
   startPlaying(nodeId);
 }
 
-// Forget every recording in every node: abandons takes in progress, stops all
-// loops and empties the loop memory. Returns how many stored loops were dropped.
+// Forget one node's recording: abandons a take in progress, stops its loop
+// and drops the stored take. Returns true if there was anything to forget.
+export function clearRecording(nodeId) {
+  const had = loops.has(nodeId) || recording.has(nodeId) || playing.has(nodeId);
+  if (recording.has(nodeId)) { clearTimeout(recording.get(nodeId).timer); recording.delete(nodeId); }
+  stopPlaying(nodeId);
+  if (loops.has(nodeId)) setLoop(nodeId, null);
+  statusHook(nodeId);
+  return had;
+}
+
+// Forget every recording in every node. Returns how many stored loops were dropped.
 export function clearAllRecordings() {
   const ids = new Set([...loops.keys(), ...recording.keys(), ...playing.keys()]);
   const dropped = loops.size;
-  for (const id of [...recording.keys()]) { clearTimeout(recording.get(id).timer); recording.delete(id); }
-  for (const id of [...playing.keys()]) stopPlaying(id);
-  for (const id of [...loops.keys()]) setLoop(id, null);
-  for (const id of ids) statusHook(id);
+  for (const id of ids) clearRecording(id);
   return dropped;
 }
 
@@ -130,45 +139,57 @@ function startRecording(nodeId) {
     events: [],
     timer: setTimeout(() => finishRecording(nodeId), MAX_RECORD_MS),
     base, // overdub target, or null for a fresh take
-    start: 0, end: 0, // the looping window overdubbed moves are stamped into
-    cur: null, // overdub: latest value seen per setting
-    tracks: new Map(), // overdub: setting -> {cycle, initial, events} (its latest pass)
+    current: base, // the stored take as of the last commit (overdub)
+    tracks: new Map(), // overdub: setting -> its new events, timed from startedAt
     muted: new Set(), // overdub: settings the user has taken over from the saved take
   };
   if (base) {
-    // Overdub: play the saved take from the top of its window and stamp new
-    // moves on its timeline. Snapshot the starting values AFTER the pass has
-    // restored the take's state, so a taken-over setting starts where the take did.
+    // Overdub: play the saved take from the top of its window, then snapshot the
+    // starting values AFTER that pass has restored the take's state, so a taken-over
+    // setting starts where the take did.
     recording.set(nodeId, rec);
     restartPlaying(nodeId, base, rec.muted);
-    const p = playing.get(nodeId);
-    rec.startedAt = p.startedAt;
-    rec.start = p.start;
-    rec.end = p.end;
+    rec.startedAt = playing.get(nodeId).startedAt;
   } else {
     stopPlaying(nodeId); // replayed moves must not fight, or be mistaken for, the new take
   }
   rec.initial = { ...node.params, [BYPASS_KEY]: !!node.bypassed };
-  rec.cur = { ...rec.initial };
   recording.set(nodeId, rec);
   if (base) ensureTicker();
   statusHook(nodeId);
 }
 
-// Fold an overdub's tracks into the saved take: each recorded setting's old
-// events are replaced by the new ones (untouched settings keep theirs), then
-// the events are put back in time order (stable, so ties keep insertion order).
-function mergeOverdub(rec) {
-  const base = rec.base;
-  const names = new Set(rec.tracks.keys());
-  const initial = { ...base.initial };
-  const events = base.events.filter((e) => !names.has(e.name));
-  for (const [name, tr] of rec.tracks) {
-    initial[name] = tr.initial;
-    events.push(...tr.events);
+// Fold the overdub so far into the stored take as one new layer. Every setting
+// the layer holds is stripped from the take's main events and older layers (the
+// user took it over), and emptied layers are dropped. Merges always start from
+// the pristine `base`, so repeated commits replace the previous one.
+function commitOverdub(nodeId) {
+  const rec = recording.get(nodeId);
+  if (!rec || !rec.base || !rec.tracks.size) return false;
+  if (!state.nodes.has(nodeId) || loops.get(nodeId) !== rec.current) return false;
+  const elapsed = Math.min(performance.now() - rec.startedAt, MAX_RECORD_MS);
+  let last = 0;
+  const initial = {};
+  let events = [];
+  for (const [name, evs] of rec.tracks) {
+    initial[name] = rec.initial[name];
+    events = events.concat(evs);
+    last = Math.max(last, evs[evs.length - 1].t);
   }
-  events.sort((a, b) => a.t - b.t);
-  return { ...base, initial, events };
+  events.sort((a, b) => a.t - b.t); // stable: ties keep insertion order
+  const layer = { duration: Math.max(MIN_LOOP_MS, elapsed, last + 1), initial, events };
+  const names = new Set(rec.tracks.keys());
+  const strip = (l) => {
+    const init = { ...l.initial };
+    for (const n of names) delete init[n];
+    return { ...l, initial: init, events: l.events.filter((e) => !names.has(e.name)) };
+  };
+  const main = strip(rec.base);
+  const layers = (rec.base.layers || []).map((l) => (Object.keys(l.initial).some((n) => names.has(n)) || l.events.some((e) => names.has(e.name)) ? strip(l) : l)).filter((l) => l.events.length);
+  layers.push(layer);
+  rec.current = { ...rec.base, initial: main.initial, events: main.events, layers };
+  setLoop(nodeId, rec.current);
+  return true;
 }
 
 // Returns true if a take was stored. A take with no changes in it is thrown
@@ -177,13 +198,11 @@ function finishRecording(nodeId) {
   const rec = recording.get(nodeId);
   if (!rec) return false;
   clearTimeout(rec.timer);
+  if (rec.base) commitOverdub(nodeId); // final commit, while the recording is still registered
   recording.delete(nodeId);
   let stored = false;
   if (rec.base) {
-    if (rec.tracks.size && state.nodes.has(nodeId) && loops.get(nodeId) === rec.base) {
-      setLoop(nodeId, mergeOverdub(rec));
-      stored = true;
-    }
+    stored = rec.current !== rec.base;
     // The take was playing throughout; carry on with the merged take from the top.
     const loop = loops.get(nodeId);
     if (loop && state.nodes.has(nodeId)) { restartPlaying(nodeId, loop); ensureTicker(); }
@@ -218,7 +237,7 @@ function startPlaying(nodeId) {
 // point and queue the events after it.
 function restartPlaying(nodeId, loop, muted = null) {
   const { start, end } = loopBounds(loop);
-  const p = { startedAt: performance.now(), cycle: 0, idx: 0, start, end, muted };
+  const p = { startedAt: performance.now(), cycle: 0, idx: 0, start, end, muted, layerStates: new Map() };
   playing.set(nodeId, p);
   beginPass(nodeId, loop, p);
 }
@@ -276,30 +295,36 @@ function tick() {
       // on purpose — the restore would overwrite them immediately anyway.
       p.cycle = cycle;
       beginPass(nodeId, loop, p);
+      commitOverdub(nodeId); // the old take starts over: save what has been played on top of it
     }
     while (p.idx < loop.events.length && loop.events[p.idx].t <= pos) {
       const ev = loop.events[p.idx++];
       if (!p.muted || !p.muted.has(ev.name)) applyValue(nodeId, ev.name, ev.value);
     }
+    tickLayers(nodeId, loop, p, now - p.startedAt);
   }
 }
 
-// Overdub move: stamp it at its position within the looping window and file it
-// under its setting's track. The first move of a saved setting mutes that
-// setting's old track for the rest of the recording (the user has taken over).
-function recordOverdubMove(rec, name, value) {
-  const period = rec.end - rec.start;
-  const elapsed = performance.now() - rec.startedAt;
-  const cycle = Math.floor(elapsed / period);
-  const t = Math.round(rec.start + (elapsed - cycle * period));
-  rec.muted.add(name);
-  let tr = rec.tracks.get(name);
-  if (!tr || tr.cycle !== cycle) {
-    tr = { cycle, initial: rec.cur[name], events: [] }; // a later pass replaces the earlier one
-    rec.tracks.set(name, tr);
+// Layers (overdubbed tracks) loop on their own period, all timed from the pass
+// start. A layer met for the first time — or on its next cycle — restores its
+// starting values, then catches up on every event up to the current position.
+function tickLayers(nodeId, loop, p, elapsed) {
+  if (!loop.layers) return;
+  const live = (name) => !p.muted || !p.muted.has(name);
+  for (const layer of loop.layers) {
+    const cycle = Math.floor(elapsed / layer.duration);
+    const pos = elapsed - cycle * layer.duration;
+    let s = p.layerStates.get(layer);
+    if (!s || s.cycle !== cycle) {
+      s = { cycle, idx: 0 };
+      p.layerStates.set(layer, s);
+      for (const [name, value] of Object.entries(layer.initial)) if (live(name)) applyValue(nodeId, name, value);
+    }
+    while (s.idx < layer.events.length && layer.events[s.idx].t <= pos) {
+      const ev = layer.events[s.idx++];
+      if (live(ev.name)) applyValue(nodeId, ev.name, ev.value);
+    }
   }
-  tr.events.push({ t, name, value });
-  rec.cur[name] = value;
 }
 
 onChange((kind, payload) => {
@@ -309,8 +334,15 @@ onChange((kind, payload) => {
     if (!rec) return;
     const name = kind === 'bypass-change' ? BYPASS_KEY : payload.name;
     const value = kind === 'bypass-change' ? !!payload.bypassed : payload.value;
-    if (rec.base) { recordOverdubMove(rec, name, value); return; }
-    rec.events.push({ t: Math.round(performance.now() - rec.startedAt), name, value });
+    const ev = { t: Math.round(performance.now() - rec.startedAt), name, value };
+    if (rec.base) {
+      // Overdub: the user has taken this setting over from the saved take.
+      rec.muted.add(name);
+      if (!rec.tracks.has(name)) rec.tracks.set(name, []);
+      rec.tracks.get(name).push(ev);
+      return;
+    }
+    rec.events.push(ev);
     return;
   }
   if (kind === 'node-remove' || kind === 'clear' || kind === 'load') {

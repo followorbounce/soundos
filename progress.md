@@ -29,6 +29,7 @@
 - 2026-09-19 — Added a Cloudflare Web Analytics beacon (cross-repo rollout across every deployed followorbounce/client site). See [[cloudflare-analytics-setup]] in the assistant's memory for the account/token map.
 
 - 2026-09-21 — Overdub recording + Clear takes. Record on a node with a saved take now plays that take and layers on it: new settings become parallel tracks, touching a recorded setting replaces only its track. New toolbar button **Clear takes** erases every node's loops (confirm; not undoable, loops are outside undo). Verified in headless Firefox by driving `recorder.js` (add track, replace track, clear).
+- 2026-09-21 (later) — Overdub v2: new tracks are no longer wrapped onto the old take's length — they form a `layer` with its own duration (a 1.9 s gesture over a 0.66 s loop stays 1.9 s), committed to the take at every old-loop wrap and on stop. Per-node × clear button beside Play; toolbar **Clear takes** now applies instantly (confirm dialog removed; a toast reports the count). Fixed along the way: the final commit ran after the recording was deregistered and dropped the last moves. Verified in headless Firefox.
 
 ## Next steps (from README "Ideas for later")
 

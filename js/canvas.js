@@ -1,7 +1,7 @@
 import { NODE_TYPES } from './nodeLibrary.js';
 import { state, onChange, moveNode, removeNode, setParam, addEdge, removeEdge, toggleBypass, setBypassState, checkpoint, undo, redo } from './state.js';
 import { engine } from './audio/engine.js';
-import { toggleRecord, togglePlay, getStatus, setApplyHook, setStatusHook, stopAllPlaying, setTrim, BYPASS_KEY, MAX_RECORD_MS } from './recorder.js';
+import { toggleRecord, togglePlay, clearRecording, getStatus, setApplyHook, setStatusHook, stopAllPlaying, setTrim, BYPASS_KEY, MAX_RECORD_MS } from './recorder.js';
 
 const viewport = document.getElementById('canvas-viewport');
 const inner = document.getElementById('canvas-inner');
@@ -437,13 +437,16 @@ function renderNode(node) {
     recBtn.className = 'fswitch loopbtn rec';
     const playBtn = document.createElement('button');
     playBtn.className = 'fswitch loopbtn play';
-    for (const b of [recBtn, playBtn]) {
+    const clrBtn = document.createElement('button');
+    clrBtn.className = 'fswitch loopbtn clr';
+    for (const b of [recBtn, playBtn, clrBtn]) {
       b.appendChild(Object.assign(document.createElement('span'), { className: 'glyph' }));
       b.addEventListener('mousedown', (e) => e.stopPropagation());
     }
     recBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleRecord(node.id); });
     playBtn.addEventListener('click', (e) => { e.stopPropagation(); togglePlay(node.id); });
-    headLeft.append(recBtn, playBtn);
+    clrBtn.addEventListener('click', (e) => { e.stopPropagation(); clearRecording(node.id); });
+    headLeft.append(recBtn, playBtn, clrBtn);
     const bar = document.createElement('div');
     bar.className = 'loopbar';
     const win = document.createElement('div'); // the active (trimmed) window; the progress fill lives inside it
@@ -544,18 +547,21 @@ function paintLoopUi(nodeId) {
   if (!el) return;
   const recBtn = el.querySelector('.loopbtn.rec');
   const playBtn = el.querySelector('.loopbtn.play');
+  const clrBtn = el.querySelector('.loopbtn.clr');
   const bar = el.querySelector('.loopbar');
-  if (!recBtn || !playBtn || !bar) return;
+  if (!recBtn || !playBtn || !clrBtn || !bar) return;
   const st = getStatus(nodeId);
   recBtn.classList.toggle('engaged', st.recording);
   recBtn.title = st.recording
     ? 'Stop recording'
     : st.hasLoop
-      ? `Record on top of the saved loop: it plays while you record, settings it never held are added as new tracks, and moving one it already holds replaces just that track (up to ${MAX_RECORD_MS / 1000} s; click again to stop)`
+      ? `Record on top of the saved loop: it plays while you record, settings it never held are added as new tracks of their own length, and moving one it already holds replaces just that track (up to ${MAX_RECORD_MS / 1000} s; click again to stop)`
       : `Record every change to this node's settings, including on/off (up to ${MAX_RECORD_MS / 1000} s; click again to stop)`;
   playBtn.classList.toggle('engaged', st.playing);
   playBtn.classList.toggle('empty', !st.hasLoop && !st.recording);
   playBtn.title = st.playing ? 'Stop the loop' : st.hasLoop ? 'Play the recorded settings in a loop' : 'Nothing recorded yet — press record first';
+  clrBtn.classList.toggle('empty', !st.hasLoop && !st.recording);
+  clrBtn.title = st.hasLoop || st.recording ? "Erase this node's recording (no undo)" : 'Nothing recorded on this node';
   const win = bar.querySelector('.loopwin');
   const fill = win.firstChild;
   fill.style.animation = 'none';

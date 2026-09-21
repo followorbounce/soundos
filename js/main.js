@@ -1,7 +1,7 @@
 import { initCanvas, setScopeMode, setCompactMode, randomizeAllParams, applyPreset, zoomTo, getZoom } from './canvas.js';
 import { initMenu } from './menu.js';
 import { clearAllRecordings } from './recorder.js';
-import { state, loops, addNode, addEdge, clearAll, setParam, onChange, resetHistory } from './state.js';
+import { state, addNode, addEdge, clearAll, setParam, onChange, resetHistory } from './state.js';
 import { NODE_TYPES } from './nodeLibrary.js';
 import { engine } from './audio/engine.js';
 import { exportPatch, importPatch } from './exporter.js';
@@ -198,10 +198,8 @@ fileImport.addEventListener('change', async () => {
   fileImport.value = '';
 });
 btnClearTakes.addEventListener('click', () => {
-  if (!loops.size) { toast('No recordings to clear'); return; }
-  if (!confirm(`Erase all recordings (${loops.size} node${loops.size === 1 ? '' : 's'}) in every node? This cannot be undone.`)) return;
-  clearAllRecordings();
-  toast('All recordings cleared');
+  const n = clearAllRecordings();
+  toast(`Cleared ${n} recording${n === 1 ? '' : 's'}`);
 });
 btnClear.addEventListener('click', () => {
   if (confirm('Clear the entire patch?')) {
