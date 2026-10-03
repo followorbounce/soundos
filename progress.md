@@ -35,6 +35,8 @@
 
 - 2026-09-21 (later) — New generator node **NYX** (digital Dreadbox NYX reissue: paraphonic 2-VCO + dual 12 dB filters with NOR/SPLIT/HALF/VCA routing, 3 looping AD envelopes, vibrato, noise, reverb; 33 params). Added generic `wide` nodes + `group` param sections to canvas/CSS. Verified in headless Firefox: audio flows, every routing/filter mode changes the sound, Env 1 modulates level (RMS 0.008↔0.277), no errors. Not modelled: hard sync, analog drift; ODD mode is a guess. Sources: Dreadbox NYX reissue coverage (Synth Anatomy, Perfect Circuit, Gearnews) — official manual pages weren't fetchable.
 
+- 2026-10-02 — Review pass (not committed). **Fixed** `js/audio/engine.js`: `disposeGraph()` never disconnected the engine-owned bypass wrappers (`nodeOut`/`wet`/`dry`) or scope analysers, so every live re-patch left the previous Output wrapper connected to `master` (graph leak growing per structural edit). They are now tracked in `this.wrappers` and disconnected on rebuild/stop. **Fixed** `js/canvas.js` knobs: were `mousedown`-only (no touch drag, no keyboard); now pointer events with `touch-action: none`, plus `role="slider"`, `tabindex`, aria values, and Arrow/PageUp/PageDown/Home/End keys. Not browser-tested this pass (syntax-checked only).
+
 ## Next steps (from README "Ideas for later")
 
 - Export a patch to a standalone HTML file that plays with no editor.

@@ -283,36 +283,69 @@ function buildKnob(nodeId, def, node) {
   kval.className = 'kval';
 
   const range = def.max - def.min;
+  const step = def.step || (range / 100) || 1;
+  // Exposed as a slider so it is reachable by keyboard / screen readers.
+  knob.tabIndex = 0;
+  knob.setAttribute('role', 'slider');
+  knob.setAttribute('aria-label', def.label);
+  knob.setAttribute('aria-valuemin', def.min);
+  knob.setAttribute('aria-valuemax', def.max);
+  knob.style.touchAction = 'none'; // let pointer drags work on touch screens instead of scrolling
   const apply = (value) => {
     const t = range === 0 ? 0 : (value - def.min) / range;
     knob.style.setProperty('--t', t);
     ind.style.transform = `rotate(${-135 + t * 270}deg)`;
     kval.textContent = fmt(value);
+    knob.setAttribute('aria-valuenow', value);
+    knob.setAttribute('aria-valuetext', kval.textContent);
   };
   apply(node.params[def.name]);
   controlSync.get(nodeId).set(def.name, apply);
 
-  knob.addEventListener('mousedown', (e) => {
+  const commit = (raw) => {
+    let value = Math.round(raw / step) * step;
+    value = Math.min(def.max, Math.max(def.min, value));
+    apply(value);
+    onParamInput(nodeId, def.name, value);
+  };
+
+  // Pointer events (not mouse-only) so knobs also turn on touch devices.
+  knob.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
-    checkpoint(); // once per drag, not once per mousemove (see the undo/redo note in state.js)
+    checkpoint(); // once per drag, not once per pointermove (see the undo/redo note in state.js)
     const startY = e.clientY;
     const startValue = node.params[def.name];
     const onMove = (ev) => {
       const dy = startY - ev.clientY;
-      const step = def.step || (range / 100) || 1;
-      let value = startValue + (dy / 150) * range;
-      value = Math.round(value / step) * step;
-      value = Math.min(def.max, Math.max(def.min, value));
-      apply(value);
-      onParamInput(nodeId, def.name, value);
+      commit(startValue + (dy / 150) * range);
     };
     const onUp = () => {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      document.removeEventListener('pointercancel', onUp);
     };
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+    document.addEventListener('pointercancel', onUp);
+  });
+
+  knob.addEventListener('keydown', (e) => {
+    const cur = node.params[def.name];
+    const big = Math.max(step, range / 10);
+    let next = null;
+    if (e.key === 'ArrowUp' || e.key === 'ArrowRight') next = cur + step;
+    else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') next = cur - step;
+    else if (e.key === 'PageUp') next = cur + big;
+    else if (e.key === 'PageDown') next = cur - big;
+    else if (e.key === 'Home') next = def.min;
+    else if (e.key === 'End') next = def.max;
+    if (next === null) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (!e.repeat) checkpoint();
+    commit(next);
   });
 
   wrap.append(klabel, knob, kval);

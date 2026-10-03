@@ -54,6 +54,7 @@ export class SynthEngine {
     this.workletReady = false;
     this.scopeAnalysers = new Map(); // nodeId -> AnalyserNode, for the per-node waveform toggle
     this.bypass = new Map(); // nodeId -> {wet, dry} bypass-crossfade gains
+    this.wrappers = []; // engine-owned nodes (bypass wrappers, scope analysers) — disconnected on rebuild
     this.powered = false;
     this.speed = 1; // global varispeed multiplier, see speedScale() above
   }
@@ -107,12 +108,14 @@ export class SynthEngine {
       const wet = this.ctx.createGain();
       wet.gain.value = bypassed ? 0 : 1;
       rawOut.connect(wet).connect(nodeOut);
+      this.wrappers.push(nodeOut, wet);
       let dry = null;
       const dryTap = inst.inputs && inst.inputs.in && inst.inputs.in.node !== rawOut ? inst.inputs.in.node : null;
       if (dryTap) {
         dry = this.ctx.createGain();
         dry.gain.value = bypassed ? 1 : 0;
         dryTap.connect(dry).connect(nodeOut);
+        this.wrappers.push(dry);
       }
       inst.output = nodeOut;
       this.bypass.set(id, { wet, dry });
@@ -129,6 +132,7 @@ export class SynthEngine {
       const analyser = this.ctx.createAnalyser();
       analyser.fftSize = 512;
       try { inst.output.connect(analyser); } catch (e) {}
+      this.wrappers.push(analyser);
       this.scopeAnalysers.set(id, analyser);
     }
     // Envelope nodes gate a shape open on demand; with no keyboard to trigger
@@ -166,6 +170,13 @@ export class SynthEngine {
     for (const inst of this.instances.values()) {
       try { inst.dispose(); } catch (e) {}
     }
+    // Each node's own dispose() only tears down its internals; the wrapper
+    // gains/analysers made in rebuild() must be cut too, or every live
+    // re-patch leaves the previous Output wrapper still connected to master.
+    for (const n of this.wrappers) {
+      try { n.disconnect(); } catch (e) {}
+    }
+    this.wrappers = [];
     this.instances.clear();
     this.scopeAnalysers.clear();
     this.bypass.clear();
