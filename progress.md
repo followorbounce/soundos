@@ -43,3 +43,6 @@
 - Snap-to-grid for ordinary dragging.
 - Surgical live re-patching (add/remove a single cable/node with no full rebuild/click).
 - MIDI input as a CV source (frequency/gate) for generators.
+
+## 2026-10-16 — Index infrastructure
+- added missing canonical URL, description where absent, Open Graph and twitter:card tags. The host-level robots.txt / sitemap index / llms.txt live in followorbounce.github.io.
